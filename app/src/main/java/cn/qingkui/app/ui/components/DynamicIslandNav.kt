@@ -23,8 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cn.qingkui.app.ui.model.AppDestination
 import cn.qingkui.app.ui.theme.QingkuiDarkSurface
-import cn.qingkui.app.ui.theme.QingkuiGreenSoft
-import cn.qingkui.app.ui.theme.QingkuiInk
 
 @Composable
 fun DynamicIslandNav(
@@ -59,7 +57,7 @@ fun DynamicIslandNav(
                     .width(itemWidth)
                     .fillMaxHeight()
                     .background(
-                        color = if (active) QingkuiGreenSoft else Color.Transparent,
+                        color = if (active) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                         shape = RoundedCornerShape(22.dp),
                     )
                     .clickable(
@@ -74,7 +72,7 @@ fun DynamicIslandNav(
                     text = if (!compact && destination == AppDestination.Account) "更多" else destination.label,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Medium,
-                    color = if (active) QingkuiInk else Color.White.copy(alpha = .72f),
+                    color = if (active) MaterialTheme.colorScheme.onPrimaryContainer else Color.White.copy(alpha = .72f),
                 )
             }
         }

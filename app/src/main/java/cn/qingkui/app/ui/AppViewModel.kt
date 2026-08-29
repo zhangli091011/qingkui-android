@@ -1,147 +1,351 @@
 package cn.qingkui.app.ui
 
-import androidx.lifecycle.SavedStateHandle
+import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import cn.qingkui.app.data.repository.ApiFailureException
+import cn.qingkui.app.data.repository.AppRepository
+import cn.qingkui.app.data.repository.AppRepositoryProvider
 import cn.qingkui.app.ui.model.AppDestination
 import cn.qingkui.app.ui.model.AppUiState
+import cn.qingkui.app.ui.model.AuthMode
 import cn.qingkui.app.ui.model.ChatMessage
-import cn.qingkui.app.ui.model.KnowledgeNode
-import cn.qingkui.app.ui.model.KnowledgeKind
-import cn.qingkui.app.ui.model.KnowledgeRelation
-import cn.qingkui.app.ui.model.KnowledgeSource
-import cn.qingkui.app.ui.model.KnowledgeStatus
-import cn.qingkui.app.ui.model.LearningItem
 import cn.qingkui.app.ui.model.MessageAuthor
-import cn.qingkui.app.ui.model.RelationType
+import cn.qingkui.app.ui.model.QaHelpLevel
+import cn.qingkui.app.ui.model.QaMode
+import cn.qingkui.app.ui.model.KnowledgeStatus
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
-class AppViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel() {
-    private val _uiState = MutableStateFlow(
-        AppUiState(
-            destination = savedStateHandle.get<String>(KEY_DESTINATION)
-                ?.let { value -> AppDestination.entries.firstOrNull { it.name == value } }
-                ?: AppDestination.Chat,
-            draft = savedStateHandle.get<String>(KEY_DRAFT) ?: "",
-        ),
-    )
+class AppViewModel(private val repository: AppRepository) : ViewModel() {
+    private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
 
-    val graphNodes = listOf(
-        KnowledgeNode(
-            "linear_function", "一次函数", "前置知识", KnowledgeStatus.Verified, .12f, .60f,
-            KnowledgeKind.Concept, KnowledgeSource.Official,
-            "形如 y = kx + b 的函数，是理解函数图像与变化趋势的基础。",
-            "必修第一册 · 第 3 章", true,
-        ),
-        KnowledgeNode(
-            "function_concept", "函数概念", "前置知识", KnowledgeStatus.Understood, .27f, .27f,
-            KnowledgeKind.Concept, KnowledgeSource.Official,
-            "描述两个变量之间确定对应关系的数学模型。",
-            "必修第一册 · 3.1 函数的概念", true,
-        ),
-        KnowledgeNode(
-            "quadratic_function", "二次函数", "当前知识", KnowledgeStatus.Explored, .49f, .49f,
-            KnowledgeKind.Concept, KnowledgeSource.Official,
-            "一般地，形如 y = ax² + bx + c（a ≠ 0）的函数叫作二次函数。",
-            "必修第一册 · 3.2 二次函数", true,
-        ),
-        KnowledgeNode(
-            "discriminant", "判别式", "关联公式", KnowledgeStatus.Unstable, .70f, .25f,
-            KnowledgeKind.Formula, KnowledgeSource.Official,
-            "Δ = b² - 4ac，用来判断一元二次方程实数根的个数。",
-            "必修第一册 · 2.3 一元二次方程", false,
-        ),
-        KnowledgeNode(
-            "quadratic_inequality", "一元二次不等式", "迁移应用", KnowledgeStatus.Unexplored, .86f, .56f,
-            KnowledgeKind.Method, KnowledgeSource.AiCandidate,
-            "结合二次函数图像判断不等式解集，是函数与方程思想的综合应用。",
-            "AI 关联建议 · 待教师审核", false,
-        ),
-        KnowledgeNode(
-            "parabola", "抛物线", "易错知识", KnowledgeStatus.ErrorProne, .65f, .78f,
-            KnowledgeKind.Concept, KnowledgeSource.Personal,
-            "二次函数的图像，开口方向、顶点和对称轴由解析式共同决定。",
-            "个人知识卡 · 最近更新于昨天", true,
-        ),
-        KnowledgeNode(
-            "vertex_formula", "顶点式", "常用方法", KnowledgeStatus.Explored, .39f, .82f,
-            KnowledgeKind.Formula, KnowledgeSource.Official,
-            "y = a(x-h)² + k 可直接读出抛物线顶点 (h, k)。",
-            "必修第一册 · 3.2 二次函数", false,
-        ),
-        KnowledgeNode(
-            "parameter_problem", "参数范围题", "典型题型", KnowledgeStatus.Unexplored, .88f, .82f,
-            KnowledgeKind.QuestionType, KnowledgeSource.Personal,
-            "根据根、交点或最值条件建立参数不等式。",
-            "个人知识卡 · 来源：错题整理", false,
-        ),
-    )
+    init {
+        viewModelScope.launch {
+            val hasSession = repository.hasSession()
+            _uiState.update {
+                it.copy(
+                    authChecking = false,
+                    authenticated = hasSession,
+                    currentUserName = repository.nickname() ?: it.currentUserName,
+                )
+            }
+            if (hasSession) refreshContent()
+        }
+    }
 
-    val graphRelations = listOf(
-        KnowledgeRelation("function_concept", "quadratic_function", RelationType.Prerequisite),
-        KnowledgeRelation("linear_function", "quadratic_function", RelationType.Prerequisite),
-        KnowledgeRelation("quadratic_function", "discriminant", RelationType.Related),
-        KnowledgeRelation("quadratic_function", "parabola", RelationType.Confusable),
-        KnowledgeRelation("quadratic_function", "vertex_formula", RelationType.Related),
-        KnowledgeRelation("quadratic_function", "quadratic_inequality", RelationType.Related),
-        KnowledgeRelation("discriminant", "parameter_problem", RelationType.QuestionType),
-        KnowledgeRelation("parabola", "parameter_problem", RelationType.QuestionType),
-    )
+    fun setAuthMode(mode: AuthMode) = _uiState.update { it.copy(authMode = mode, errorMessage = null) }
+    fun updateUsername(value: String) = _uiState.update { it.copy(username = value, errorMessage = null) }
+    fun updatePassword(value: String) = _uiState.update { it.copy(password = value, errorMessage = null) }
+    fun updateNickname(value: String) = _uiState.update { it.copy(nickname = value, errorMessage = null) }
 
-    val learningItems = listOf(
-        LearningItem("quadratic_function", "二次函数", KnowledgeStatus.Explored, "今天 09:20", "继续探索"),
-        LearningItem("discriminant", "判别式", KnowledgeStatus.Unstable, "昨天 20:42", "开始复习"),
-        LearningItem("parabola", "抛物线的顶点与对称轴", KnowledgeStatus.ErrorProne, "8 月 26 日", "查看错因"),
-        LearningItem("linear_function", "一次函数", KnowledgeStatus.Verified, "8 月 24 日", "回到图谱"),
-    )
+    fun submitAuth() {
+        val state = _uiState.value
+        if (state.username.trim().length < 3 || state.password.length < 8) {
+            _uiState.update { it.copy(errorMessage = "用户名至少 3 位，密码至少 8 位") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(authLoading = true, errorMessage = null) }
+            try {
+                val name = if (state.authMode == AuthMode.Login) {
+                    repository.login(state.username, state.password)
+                } else {
+                    repository.register(state.username, state.password, state.nickname)
+                }
+                _uiState.update {
+                    it.copy(
+                        authenticated = true,
+                        authScreenOpen = false,
+                        authLoading = false,
+                        password = "",
+                        currentUserName = name,
+                        pendingSendAfterAuth = false,
+                    )
+                }
+                refreshContentNow()
+                if (state.pendingSendAfterAuth) sendMessage()
+            } catch (error: Exception) {
+                _uiState.update { it.copy(authLoading = false, errorMessage = error.userMessage()) }
+            }
+        }
+    }
+
+    fun refreshContent() {
+        viewModelScope.launch {
+            refreshContentNow()
+        }
+    }
+
+    private suspend fun refreshContentNow() {
+        _uiState.update { it.copy(contentLoading = true, errorMessage = null) }
+        try {
+            val (credits, graph, learning, sessions, ledger) = coroutineScope {
+                val creditTask = async { repository.credits() }
+                val graphTask = async { repository.graph() }
+                val learningTask = async { repository.learningItems() }
+                val sessionsTask = async { repository.sessions() }
+                val ledgerTask = async { repository.creditLedger() }
+                Quintuple(creditTask.await(), graphTask.await(), learningTask.await(), sessionsTask.await(), ledgerTask.await())
+            }
+            _uiState.update {
+                it.copy(
+                    credits = credits,
+                    graphNodes = graph.nodes,
+                    graphRelations = graph.relations,
+                    selectedNodeId = graph.selectedNodeId,
+                    currentSubject = graph.nodes.firstOrNull()?.evidence?.substringBefore(" · ") ?: it.currentSubject,
+                    learningItems = learning,
+                    sessions = sessions,
+                    ledger = ledger,
+                    contentLoading = false,
+                )
+            }
+        } catch (error: Exception) {
+            handleApiError(error) { it.copy(contentLoading = false) }
+        }
+    }
 
     fun selectDestination(destination: AppDestination) {
-        savedStateHandle[KEY_DESTINATION] = destination.name
         _uiState.update { it.copy(destination = destination, drawerOpen = false) }
     }
 
-    fun updateDraft(value: String) {
-        savedStateHandle[KEY_DRAFT] = value
-        _uiState.update { it.copy(draft = value) }
-    }
+    fun updateDraft(value: String) = _uiState.update { it.copy(draft = value, errorMessage = null) }
+    fun selectHelpLevel(value: QaHelpLevel) = _uiState.update { it.copy(helpLevel = value, errorMessage = null) }
+    fun selectQaMode(value: QaMode) = _uiState.update { it.copy(qaMode = value, errorMessage = null, conversationId = null, messages = emptyList()) }
 
     fun sendMessage() {
-        val question = _uiState.value.draft.trim()
-        if (question.isEmpty()) return
+        val state = _uiState.value
+        val question = state.draft.trim()
+        if (question.isEmpty() || state.sending) return
+        if (!state.authenticated) {
+            _uiState.update {
+                it.copy(authScreenOpen = true, pendingSendAfterAuth = true, errorMessage = null)
+            }
+            return
+        }
+        if (state.credits < state.helpLevel.creditCost) {
+            _uiState.update { it.copy(errorMessage = "额度不足，当前回答需要 ${state.helpLevel.creditCost} 额度") }
+            return
+        }
         val messageId = System.currentTimeMillis()
-        val answer = "二次函数可以写成 y = ax² + bx + c（a ≠ 0）。它的图像是一条抛物线，a 的正负决定开口方向。你可以先观察 a、b、c 分别变化时，图像会发生什么。"
+        val assistantMessageId = messageId + 1
         _uiState.update {
             it.copy(
                 draft = "",
-                credits = (it.credits - 1).coerceAtLeast(0),
+                sending = true,
+                errorMessage = null,
                 messages = it.messages + listOf(
                     ChatMessage(messageId, MessageAuthor.Student, question),
-                    ChatMessage(messageId + 1, MessageAuthor.Assistant, answer, "高一数学 · 二次函数"),
+                    ChatMessage(assistantMessageId, MessageAuthor.Assistant, ""),
                 ),
             )
         }
-        savedStateHandle[KEY_DRAFT] = ""
+        viewModelScope.launch {
+            try {
+                val result = repository.sendQuestion(
+                    state.conversationId,
+                    state.selectedNodeId,
+                    question,
+                    state.qaMode,
+                    state.helpLevel,
+                ) { chunk ->
+                    _uiState.update { current ->
+                        current.copy(
+                            messages = current.messages.map { message ->
+                                if (message.id == assistantMessageId) message.copy(text = message.text + chunk) else message
+                            },
+                        )
+                    }
+                }
+                _uiState.update {
+                    it.copy(
+                        messages = it.messages.map { message ->
+                            if (message.id == assistantMessageId) result.message else message
+                        },
+                        conversationId = result.conversationId,
+                        currentSubject = result.subject ?: it.currentSubject,
+                        credits = result.balance,
+                        sending = false,
+                    )
+                }
+            } catch (error: Exception) {
+                handleApiError(error) {
+                    it.copy(
+                        sending = false,
+                        draft = question,
+                        messages = it.messages.filterNot { message ->
+                            message.id == messageId || message.id == assistantMessageId
+                        },
+                    )
+                }
+            }
+        }
     }
 
     fun selectNode(nodeId: String) {
-        _uiState.update { it.copy(selectedNodeId = nodeId) }
+        _uiState.update { it.copy(selectedNodeId = nodeId, conversationId = null) }
+        viewModelScope.launch {
+            runCatching { repository.graph(nodeId) }
+                .onSuccess { graph -> _uiState.update { it.copy(graphNodes = graph.nodes, graphRelations = graph.relations, selectedNodeId = nodeId) } }
+                .onFailure { handleApiError(it as? Exception ?: Exception(it)) { state -> state } }
+            runCatching { repository.nodeDetail(nodeId) }
+                .onSuccess { detail -> _uiState.update { it.copy(selectedNodeDetail = detail, graphNodes = it.graphNodes.map { node -> if (node.id == nodeId) detail else node }) } }
+                .onFailure { handleApiError(it as? Exception ?: Exception(it)) { state -> state } }
+            runCatching { repository.recordLearningEvent(nodeId, "viewed_node") }
+        }
+    }
+
+    fun markNodeStatus(status: KnowledgeStatus) {
+        val nodeId = _uiState.value.selectedNodeId ?: return
+        viewModelScope.launch {
+            try {
+                repository.updateNodeState(nodeId, status, _uiState.value.noteDraft, null)
+                _uiState.update { state -> state.copy(graphNodes = state.graphNodes.map { if (it.id == nodeId) it.copy(status = status) else it }, learningItems = state.learningItems.map { if (it.nodeId == nodeId) it.copy(status = status) else it }) }
+            } catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun toggleFavorite() {
+        val nodeId = _uiState.value.selectedNodeId ?: return
+        val node = _uiState.value.graphNodes.firstOrNull { it.id == nodeId } ?: return
+        viewModelScope.launch {
+            try {
+                repository.updateNodeState(nodeId, node.status, _uiState.value.noteDraft, !node.saved)
+                _uiState.update { state -> state.copy(graphNodes = state.graphNodes.map { if (it.id == nodeId) it.copy(saved = !node.saved) else it }) }
+            } catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun updateNote(value: String) {
+        val nodeId = _uiState.value.selectedNodeId
+        _uiState.update { it.copy(noteDraft = value) }
+        if (nodeId != null) {
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(450)
+                runCatching { repository.updateNodeState(nodeId, _uiState.value.graphNodes.firstOrNull { it.id == nodeId }?.status ?: KnowledgeStatus.Explored, value, null) }
+            }
+        }
+    }
+
+    fun searchGraph(query: String) {
+        if (query.isBlank()) { refreshContent(); return }
+        viewModelScope.launch {
+            runCatching { repository.search(query.trim()) }
+                .onSuccess { graph -> _uiState.update { it.copy(graphNodes = graph.nodes, graphRelations = graph.relations, selectedNodeId = graph.selectedNodeId) } }
+                .onFailure { handleApiError(it as? Exception ?: Exception(it)) { state -> state } }
+        }
+    }
+
+    fun restoreSession(sessionId: String) {
+        viewModelScope.launch {
+            try {
+                val restored = repository.restoreSession(sessionId)
+                _uiState.update { it.copy(conversationId = sessionId, messages = restored, destination = AppDestination.Chat, drawerOpen = false) }
+            } catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun deleteSession(sessionId: String) {
+        viewModelScope.launch {
+            try {
+                repository.deleteSession(sessionId)
+                _uiState.update { state -> state.copy(sessions = state.sessions.filterNot { it.id == sessionId }, conversationId = if (state.conversationId == sessionId) null else state.conversationId, messages = if (state.conversationId == sessionId) emptyList() else state.messages) }
+            } catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun changePassword(current: String, next: String) {
+        viewModelScope.launch {
+            try { repository.changePassword(current, next); repository.logout(); _uiState.value = AppUiState(authChecking = false, destination = AppDestination.Account, errorMessage = "密码已修改，请重新登录") }
+            catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun deleteAccount() {
+        viewModelScope.launch {
+            try { repository.deleteAccount(); _uiState.value = AppUiState(authChecking = false, destination = AppDestination.Account, errorMessage = "账户已注销") }
+            catch (error: Exception) { handleApiError(error) { it } }
+        }
     }
 
     fun askAboutNode(nodeId: String) {
-        val node = graphNodes.firstOrNull { it.id == nodeId } ?: return
+        val node = _uiState.value.graphNodes.firstOrNull { it.id == nodeId } ?: return
         updateDraft("请帮我理解${node.title}")
         selectDestination(AppDestination.Chat)
     }
 
-    fun setDrawerOpen(open: Boolean) {
-        _uiState.update { it.copy(drawerOpen = open) }
+    fun setDrawerOpen(open: Boolean) = _uiState.update { it.copy(drawerOpen = open) }
+    fun clearError() = _uiState.update { it.copy(errorMessage = null) }
+    fun openAuth() = _uiState.update {
+        it.copy(authScreenOpen = true, drawerOpen = false, pendingSendAfterAuth = false, errorMessage = null)
+    }
+    fun closeAuth() = _uiState.update {
+        it.copy(authScreenOpen = false, pendingSendAfterAuth = false, errorMessage = null)
     }
 
-    private companion object {
-        const val KEY_DESTINATION = "destination"
-        const val KEY_DRAFT = "chat_draft"
+    fun retryAnswer(messageId: Long) {
+        val messages = _uiState.value.messages
+        val assistantIndex = messages.indexOfFirst { it.id == messageId }
+        if (assistantIndex <= 0) return
+        val question = messages.take(assistantIndex).lastOrNull { it.author == MessageAuthor.Student }?.text ?: return
+        _uiState.update { it.copy(draft = question, errorMessage = null) }
+    }
+
+    fun submitAnswerFeedback(messageId: Long, helpful: Boolean) {
+        val message = _uiState.value.messages.firstOrNull { it.id == messageId } ?: return
+        viewModelScope.launch {
+            try {
+                repository.submitAnswerFeedback(message.serverId, helpful)
+                _uiState.update { it.copy(errorMessage = "感谢反馈，我们会持续改进回答") }
+            } catch (error: Exception) {
+                handleApiError(error) { it }
+            }
+        }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            repository.logout()
+            _uiState.value = AppUiState(
+                authChecking = false,
+                destination = AppDestination.Account,
+            )
+        }
+    }
+
+    private fun handleApiError(error: Exception, update: (AppUiState) -> AppUiState) {
+        val unauthorized = error is ApiFailureException && error.statusCode == 401
+        _uiState.update {
+            update(it).copy(
+                authenticated = if (unauthorized) false else it.authenticated,
+                authScreenOpen = false,
+                errorMessage = if (unauthorized) "登录已过期，请重新登录" else error.userMessage(),
+            )
+        }
+    }
+
+    private fun Exception.userMessage(): String = when ((this as? ApiFailureException)?.statusCode) {
+        402 -> "额度不足，请先补充额度"
+        502 -> "AI 服务暂时不可用，本次未扣除额度"
+        503 -> "AI 服务尚未配置，请联系管理员"
+        else -> message ?: "发生未知错误，请稍后重试"
+    }
+
+    companion object {
+        fun factory(context: Context): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                AppViewModel(AppRepositoryProvider.get(context)) as T
+        }
     }
 }
+
+private data class Quintuple<A, B, C, D, E>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E)

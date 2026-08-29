@@ -3,6 +3,7 @@ package cn.qingkui.app.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -30,9 +32,18 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,10 +59,8 @@ import cn.qingkui.app.ui.components.QkIconButton
 import cn.qingkui.app.ui.components.QkSvgAsset
 import cn.qingkui.app.ui.model.ChatMessage
 import cn.qingkui.app.ui.model.MessageAuthor
-import cn.qingkui.app.ui.theme.QingkuiDisabled
-import cn.qingkui.app.ui.theme.QingkuiGreen
-import cn.qingkui.app.ui.theme.QingkuiGreenSoft
-import cn.qingkui.app.ui.theme.QingkuiInk
+import cn.qingkui.app.ui.model.QaHelpLevel
+import cn.qingkui.app.ui.model.QaMode
 
 @Composable
 fun ChatScreen(
@@ -59,9 +68,18 @@ fun ChatScreen(
     draft: String,
     messages: List<ChatMessage>,
     credits: Int,
+    sending: Boolean,
+    authenticated: Boolean,
+    subject: String,
+    helpLevel: QaHelpLevel,
+    qaMode: QaMode,
     onDraftChange: (String) -> Unit,
+    onHelpLevelChange: (QaHelpLevel) -> Unit,
+    onQaModeChange: (QaMode) -> Unit,
     onSend: () -> Unit,
     onAttach: () -> Unit,
+    onFeedback: (Long, Boolean) -> Unit,
+    onRetry: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -77,6 +95,9 @@ fun ChatScreen(
             ConversationList(
                 messages = messages,
                 compact = compact,
+                sending = sending,
+                onFeedback = onFeedback,
+                onRetry = onRetry,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -84,7 +105,14 @@ fun ChatScreen(
             compact = compact,
             draft = draft,
             credits = credits,
+            sending = sending,
+            authenticated = authenticated,
+            subject = subject,
+            helpLevel = helpLevel,
+            qaMode = qaMode,
             onDraftChange = onDraftChange,
+            onHelpLevelChange = onHelpLevelChange,
+            onQaModeChange = onQaModeChange,
             onSend = onSend,
             onAttach = onAttach,
         )
@@ -122,10 +150,19 @@ private fun EmptyChatHero(compact: Boolean, modifier: Modifier = Modifier) {
 private fun ConversationList(
     messages: List<ChatMessage>,
     compact: Boolean,
+    sending: Boolean,
+    onFeedback: (Long, Boolean) -> Unit,
+    onRetry: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(messages.size, sending) {
+        val lastIndex = messages.size + if (sending) 1 else 0
+        if (lastIndex > 0) listState.animateScrollToItem(lastIndex - 1)
+    }
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
+        state = listState,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
             start = if (compact) 20.dp else 40.dp,
             end = if (compact) 20.dp else 40.dp,
@@ -135,13 +172,29 @@ private fun ConversationList(
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         items(messages, key = { it.id }) { message ->
-            MessageRow(message = message)
+            MessageRow(
+                message = message,
+                onFeedback = onFeedback,
+                onRetry = onRetry,
+            )
+        }
+        if (sending) {
+            item(key = "assistant-thinking") {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Text("正在结合知识库生成回答…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun MessageRow(message: ChatMessage) {
+private fun MessageRow(
+    message: ChatMessage,
+    onFeedback: (Long, Boolean) -> Unit,
+    onRetry: (Long) -> Unit,
+) {
     val student = message.author == MessageAuthor.Student
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -157,7 +210,7 @@ private fun MessageRow(message: ChatMessage) {
                 modifier = Modifier
                     .then(
                         if (student) {
-                            Modifier.background(QingkuiGreenSoft, RoundedCornerShape(8.dp))
+                            Modifier.background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(8.dp))
                         } else {
                             Modifier
                         },
@@ -166,18 +219,33 @@ private fun MessageRow(message: ChatMessage) {
             ) {
                 Text(message.text, style = MaterialTheme.typography.bodyLarge)
             }
-            if (!student && message.source != null) {
+            if (!student && (message.citations.isNotEmpty() || message.source != null)) {
                 Spacer(Modifier.height(12.dp))
-                Text(
-                    text = "来源 · ${message.source}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = QingkuiGreen,
-                )
+                Text("参考来源", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                if (message.citations.isNotEmpty()) {
+                    message.citations.forEach { citation ->
+                        Spacer(Modifier.height(6.dp))
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                        ) {
+                            Text("${citation.nodeName} · ${citation.sourceTitle}", style = MaterialTheme.typography.bodySmall)
+                            Text(citation.sourceLocation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (citation.excerpt.isNotBlank()) {
+                                Text(citation.excerpt, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                            }
+                        }
+                    }
+                } else {
+                    Text(message.source.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    InlineAction(Icons.Outlined.ThumbUp, "有帮助")
-                    InlineAction(Icons.Outlined.ThumbDown, "没帮助")
-                    InlineAction(Icons.Outlined.Refresh, "重新回答")
+                    InlineAction(Icons.Outlined.ThumbUp, "有帮助") { onFeedback(message.id, true) }
+                    InlineAction(Icons.Outlined.ThumbDown, "没帮助") { onFeedback(message.id, false) }
+                    InlineAction(Icons.Outlined.Refresh, "重新回答") { onRetry(message.id) }
                 }
             }
         }
@@ -185,8 +253,8 @@ private fun MessageRow(message: ChatMessage) {
 }
 
 @Composable
-private fun InlineAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+private fun InlineAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    Row(modifier = Modifier.clickable(onClick = onClick), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(4.dp))
         Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -198,12 +266,21 @@ private fun PromptComposer(
     compact: Boolean,
     draft: String,
     credits: Int,
+    sending: Boolean,
+    authenticated: Boolean,
+    subject: String,
+    helpLevel: QaHelpLevel,
+    qaMode: QaMode,
     onDraftChange: (String) -> Unit,
+    onHelpLevelChange: (QaHelpLevel) -> Unit,
+    onQaModeChange: (QaMode) -> Unit,
     onSend: () -> Unit,
     onAttach: () -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
-    val enabled = draft.isNotBlank() && credits > 0
+    var helpMenuOpen by remember { mutableStateOf(false) }
+    val hasCredits = !authenticated || credits >= helpLevel.creditCost
+    val enabled = draft.isNotBlank() && hasCredits && !sending
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -226,9 +303,30 @@ private fun PromptComposer(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("问知识 · 高一数学", style = MaterialTheme.typography.labelLarge, color = QingkuiGreen)
-                if (!compact) {
-                    Text("范围：校本知识库", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                var modeMenuOpen by remember { mutableStateOf(false) }
+                Box {
+                    TextButton(onClick = { modeMenuOpen = true }, modifier = Modifier.height(32.dp)) { Text("${qaMode.label} · $subject") }
+                    DropdownMenu(expanded = modeMenuOpen, onDismissRequest = { modeMenuOpen = false }) {
+                        QaMode.entries.forEach { mode ->
+                            DropdownMenuItem(text = { Text(mode.label) }, onClick = { onQaModeChange(mode); modeMenuOpen = false })
+                        }
+                    }
+                }
+                Box {
+                    TextButton(onClick = { helpMenuOpen = true }, modifier = Modifier.height(32.dp)) {
+                        Text("${helpLevel.label} · ${helpLevel.creditCost}额度")
+                    }
+                    DropdownMenu(expanded = helpMenuOpen, onDismissRequest = { helpMenuOpen = false }) {
+                        QaHelpLevel.entries.forEach { level ->
+                            DropdownMenuItem(
+                                text = { Text("${level.label} · ${level.creditCost}额度") },
+                                onClick = {
+                                    onHelpLevelChange(level)
+                                    helpMenuOpen = false
+                                },
+                            )
+                        }
+                    }
                 }
             }
             Row(
@@ -281,21 +379,25 @@ private fun PromptComposer(
                         onSend()
                         focusManager.clearFocus()
                     },
-                    containerColor = if (enabled) QingkuiGreen else QingkuiDisabled,
-                    contentColor = if (enabled) Color.White else QingkuiInk,
+                    containerColor = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = if (enabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                     border = null,
                     enabled = enabled,
                 )
             }
             Text(
-                text = if (compact) {
-                    "额度 ${"%,d".format(credits)} · 内容仅用于学习辅助"
+                text = if (!authenticated) {
+                    "登录后发送并同步问答与学习记录"
+                } else if (!hasCredits) {
+                    "当前额度不足，${helpLevel.label}需要 ${helpLevel.creditCost} 额度"
+                } else if (compact) {
+                    "额度 ${"%,d".format(credits)} · 本次预计 ${helpLevel.creditCost} 额度"
                 } else {
-                    "额度 ${"%,d".format(credits)} · 你的问题仅用于本次学习辅助"
+                    "额度 ${"%,d".format(credits)} · ${helpLevel.label}预计消耗 ${helpLevel.creditCost} 额度"
                 },
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (authenticated && !hasCredits) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
         }

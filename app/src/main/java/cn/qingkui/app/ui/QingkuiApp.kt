@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.SnackbarHost
@@ -21,6 +24,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
@@ -31,20 +37,56 @@ import cn.qingkui.app.ui.components.QkSvgAsset
 import cn.qingkui.app.ui.components.SessionDrawer
 import cn.qingkui.app.ui.model.AppDestination
 import cn.qingkui.app.ui.screens.AccountScreen
+import cn.qingkui.app.ui.screens.AuthScreen
 import cn.qingkui.app.ui.screens.ChatScreen
 import cn.qingkui.app.ui.screens.KnowledgeGraphScreen
 import cn.qingkui.app.ui.screens.LearningScreen
 import kotlinx.coroutines.launch
 
 @Composable
-fun QingkuiApp(viewModel: AppViewModel = viewModel()) {
+fun QingkuiApp() {
+    val context = LocalContext.current
+    val viewModel: AppViewModel = viewModel(factory = remember(context) { AppViewModel.factory(context) })
     val uiState by viewModel.uiState.collectAsState()
+    val darkTheme = isSystemInDarkTheme()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    if (uiState.authChecking) {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    if (!uiState.authenticated && uiState.authScreenOpen) {
+        AuthScreen(
+            mode = uiState.authMode,
+            username = uiState.username,
+            password = uiState.password,
+            nickname = uiState.nickname,
+            loading = uiState.authLoading,
+            errorMessage = uiState.errorMessage,
+            onModeChange = viewModel::setAuthMode,
+            onUsernameChange = viewModel::updateUsername,
+            onPasswordChange = viewModel::updatePassword,
+            onNicknameChange = viewModel::updateNickname,
+            onSubmit = viewModel::submitAuth,
+            onBack = viewModel::closeAuth,
+        )
+        return
+    }
+
     LaunchedEffect(uiState.drawerOpen) {
         if (uiState.drawerOpen) drawerState.open() else drawerState.close()
+    }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
     }
 
     ModalNavigationDrawer(
@@ -52,11 +94,17 @@ fun QingkuiApp(viewModel: AppViewModel = viewModel()) {
         gesturesEnabled = uiState.drawerOpen,
         drawerContent = {
             SessionDrawer(
+                authenticated = uiState.authenticated,
+                sessions = uiState.sessions,
                 onClose = { viewModel.setDrawerOpen(false) },
                 onOpenChat = {
                     viewModel.selectDestination(AppDestination.Chat)
                     viewModel.setDrawerOpen(false)
                 },
+                onLogout = viewModel::logout,
+                onLogin = viewModel::openAuth,
+                onRestoreSession = viewModel::restoreSession,
+                onDeleteSession = viewModel::deleteSession,
             )
         },
     ) {
@@ -67,12 +115,14 @@ fun QingkuiApp(viewModel: AppViewModel = viewModel()) {
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(androidx.compose.foundation.layout.WindowInsetsSides.Vertical)),
         ) {
             val compact = maxWidth < 600.dp
-            QkSvgAsset(
-                resourceId = if (compact) R.raw.qk_background_portrait else R.raw.qk_background_landscape,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.FillBounds,
-            )
+            if (!darkTheme) {
+                QkSvgAsset(
+                    resourceId = if (compact) R.raw.qk_background_portrait else R.raw.qk_background_landscape,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.FillBounds,
+                )
+            }
             Column(Modifier.fillMaxSize()) {
                 AppTopBar(
                     selected = uiState.destination,
@@ -81,14 +131,26 @@ fun QingkuiApp(viewModel: AppViewModel = viewModel()) {
                     onMenuClick = { viewModel.setDrawerOpen(true) },
                     onSelect = viewModel::selectDestination,
                 )
+                if (uiState.contentLoading) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
                 when (uiState.destination) {
                     AppDestination.Chat -> ChatScreen(
                         compact = compact,
                         draft = uiState.draft,
                         messages = uiState.messages,
                         credits = uiState.credits,
+                        sending = uiState.sending,
+                        authenticated = uiState.authenticated,
+                        subject = uiState.currentSubject,
+                        helpLevel = uiState.helpLevel,
+                        qaMode = uiState.qaMode,
                         onDraftChange = viewModel::updateDraft,
+                        onHelpLevelChange = viewModel::selectHelpLevel,
+                        onQaModeChange = viewModel::selectQaMode,
                         onSend = viewModel::sendMessage,
+                        onFeedback = viewModel::submitAnswerFeedback,
+                        onRetry = viewModel::retryAnswer,
                         onAttach = {
                             scope.launch {
                                 snackbarHostState.showSnackbar("图片提问将在 V1.1 接入，文字问答可正常使用")
@@ -97,14 +159,21 @@ fun QingkuiApp(viewModel: AppViewModel = viewModel()) {
                     )
                     AppDestination.Graph -> KnowledgeGraphScreen(
                         compact = compact,
-                        nodes = viewModel.graphNodes,
+                        nodes = uiState.graphNodes,
+                        relations = uiState.graphRelations,
                         selectedNodeId = uiState.selectedNodeId,
                         onSelectNode = viewModel::selectNode,
                         onAskNode = viewModel::askAboutNode,
+                        onMarkStatus = viewModel::markNodeStatus,
+                        onToggleFavorite = viewModel::toggleFavorite,
+                        note = uiState.noteDraft,
+                        onNoteChange = viewModel::updateNote,
+                        onSearch = viewModel::searchGraph,
+                        subject = uiState.currentSubject,
                     )
                     AppDestination.Learning -> LearningScreen(
                         compact = compact,
-                        items = viewModel.learningItems,
+                        items = uiState.learningItems,
                         onOpenItem = { nodeId ->
                             viewModel.selectNode(nodeId)
                             viewModel.selectDestination(AppDestination.Graph)
@@ -113,6 +182,13 @@ fun QingkuiApp(viewModel: AppViewModel = viewModel()) {
                     AppDestination.Account -> AccountScreen(
                         compact = compact,
                         credits = uiState.credits,
+                        userName = uiState.currentUserName,
+                        authenticated = uiState.authenticated,
+                        onLogin = viewModel::openAuth,
+                        onLogout = viewModel::logout,
+                        onChangePassword = viewModel::changePassword,
+                        onDeleteAccount = viewModel::deleteAccount,
+                        ledger = uiState.ledger,
                     )
                 }
             }

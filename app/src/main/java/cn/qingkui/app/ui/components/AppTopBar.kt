@@ -24,8 +24,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cn.qingkui.app.ui.model.AppDestination
-import cn.qingkui.app.ui.theme.QingkuiGreen
-import cn.qingkui.app.ui.theme.QingkuiGreenSoft
 
 @Composable
 fun AppTopBar(
@@ -65,7 +63,7 @@ fun AppTopBar(
                     text = "青葵计划",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = QingkuiGreen,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -92,7 +90,7 @@ fun AppTopBar(
                 Row(
                     modifier = Modifier
                         .height(40.dp)
-                        .background(QingkuiGreenSoft, RoundedCornerShape(18.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(18.dp))
                         .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -100,7 +98,7 @@ fun AppTopBar(
                     Box(
                         modifier = Modifier
                             .size(8.dp)
-                            .background(QingkuiGreen, RoundedCornerShape(4.dp)),
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp)),
                     )
                     Text(
                         text = "额度 ${"%,d".format(credits)}",

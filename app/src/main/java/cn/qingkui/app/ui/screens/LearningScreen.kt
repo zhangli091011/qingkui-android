@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,10 +36,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.LearningItem
-import cn.qingkui.app.ui.theme.QingkuiError
-import cn.qingkui.app.ui.theme.QingkuiGreen
-import cn.qingkui.app.ui.theme.QingkuiGreenSoft
-import cn.qingkui.app.ui.theme.QingkuiOrange
 
 @Composable
 fun LearningScreen(
@@ -65,10 +62,16 @@ fun LearningScreen(
             LearningFilters()
             Spacer(Modifier.height(20.dp))
             Divider(color = MaterialTheme.colorScheme.outline)
-            LazyColumn {
-                items(items, key = { it.nodeId }) { item ->
-                    KnowledgeStateRow(item = item, onClick = { onOpenItem(item.nodeId) })
-                    Divider(color = MaterialTheme.colorScheme.outline)
+            if (items.isEmpty()) {
+                Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
+                    Text("还没有学习记录", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                LazyColumn {
+                    items(items, key = { it.nodeId }) { item ->
+                        KnowledgeStateRow(item = item, onClick = { onOpenItem(item.nodeId) })
+                        Divider(color = MaterialTheme.colorScheme.outline)
+                    }
                 }
             }
         }
@@ -91,15 +94,15 @@ private fun FilterChip(label: String, icon: ImageVector, selected: Boolean) {
         modifier = Modifier
             .height(40.dp)
             .background(
-                if (selected) QingkuiGreenSoft else MaterialTheme.colorScheme.surface,
+                if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                 RoundedCornerShape(8.dp),
             )
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = if (selected) QingkuiGreen else MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.width(6.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge, color = if (selected) QingkuiGreen else MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, style = MaterialTheme.typography.labelLarge, color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -123,17 +126,19 @@ private fun KnowledgeStateRow(item: LearningItem, onClick: () -> Unit) {
             color = statusColor(item.status),
         )
         Spacer(Modifier.width(18.dp))
-        Text(item.action, style = MaterialTheme.typography.labelLarge, color = QingkuiGreen)
+        Text(item.action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(6.dp))
-        Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp), tint = QingkuiGreen)
+        Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
     }
 }
 
+@Composable
 private fun statusColor(status: KnowledgeStatus): Color = when (status) {
-    KnowledgeStatus.Unexplored -> Color(0xFF91A098)
-    KnowledgeStatus.Explored -> QingkuiGreen
-    KnowledgeStatus.Understood -> Color(0xFF3979A8)
-    KnowledgeStatus.Verified -> Color(0xFF476F59)
-    KnowledgeStatus.Unstable -> QingkuiOrange
-    KnowledgeStatus.ErrorProne -> QingkuiError
+    KnowledgeStatus.Unexplored -> MaterialTheme.colorScheme.onSurfaceVariant
+    KnowledgeStatus.Explored -> MaterialTheme.colorScheme.primary
+    KnowledgeStatus.Understood -> MaterialTheme.colorScheme.tertiary
+    KnowledgeStatus.Verified -> MaterialTheme.colorScheme.primary
+    KnowledgeStatus.Unstable -> MaterialTheme.colorScheme.secondary
+    KnowledgeStatus.ErrorProne -> MaterialTheme.colorScheme.error
+    KnowledgeStatus.ToExplore -> MaterialTheme.colorScheme.secondary
 }

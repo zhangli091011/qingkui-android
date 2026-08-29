@@ -26,24 +26,41 @@ import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Divider
+import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import cn.qingkui.app.ui.theme.QingkuiGreen
-import cn.qingkui.app.ui.theme.QingkuiGreenSoft
 
 @Composable
 fun AccountScreen(
     compact: Boolean,
     credits: Int,
+    userName: String,
+    authenticated: Boolean,
+    onLogin: () -> Unit,
+    onLogout: () -> Unit,
+    onChangePassword: (String, String) -> Unit = { _, _ -> },
+    onDeleteAccount: () -> Unit = {},
+    ledger: List<cn.qingkui.app.ui.model.CreditLedgerItem> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
+    var passwordDialog by remember { mutableStateOf(false) }
+    var currentPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var deleteDialog by remember { mutableStateOf(false) }
     Column(
         modifier = modifier.fillMaxSize().padding(horizontal = if (compact) 20.dp else 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -52,48 +69,110 @@ fun AccountScreen(
             Spacer(Modifier.height(if (compact) 16.dp else 32.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
-                    modifier = Modifier.size(64.dp).background(QingkuiGreenSoft, CircleShape),
+                    modifier = Modifier.size(64.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Outlined.Person, contentDescription = null, tint = QingkuiGreen, modifier = Modifier.size(32.dp))
+                    Icon(Icons.Outlined.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
                 }
                 Spacer(Modifier.width(16.dp))
                 Column {
-                    Text("青葵同学", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text("独立学习账户", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        if (authenticated) userName else "未登录",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        if (authenticated) "独立学习账户" else "登录后同步额度与学习记录",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (!authenticated) {
+                Spacer(Modifier.height(24.dp))
+                Button(
+                    onClick = onLogin,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text("登录或注册")
                 }
             }
             Spacer(Modifier.height(28.dp))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(QingkuiGreenSoft, RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(8.dp))
                     .padding(20.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Outlined.CreditCard, contentDescription = null, tint = QingkuiGreen)
+                Icon(Icons.Outlined.CreditCard, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("可用额度", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${"%,d".format(credits)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (authenticated) "${"%,d".format(credits)}" else "--",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
-                Text("查看流水", style = MaterialTheme.typography.labelLarge, color = QingkuiGreen)
+                TextButton(onClick = { }) {
+                    Text(
+                    if (authenticated) "查看流水" else "登录后查看",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
             Spacer(Modifier.height(24.dp))
             Divider(color = MaterialTheme.colorScheme.outline)
-            SettingsRow(Icons.Outlined.Key, "账户与密码", "修改密码、设备会话")
+            SettingsRow(Icons.Outlined.Key, "账户与密码", "修改密码、设备会话", onClick = { if (authenticated) passwordDialog = true })
             SettingsRow(Icons.Outlined.Brightness6, "外观", "跟随系统深色模式")
             SettingsRow(Icons.Outlined.DataUsage, "数据说明", "学习记录与隐私")
             SettingsRow(Icons.Outlined.Feedback, "问题反馈", "提交内容或使用问题")
-            SettingsRow(Icons.Outlined.Logout, "退出登录", "保留本机草稿")
+            if (authenticated) {
+                SettingsRow(Icons.Outlined.Logout, "退出登录", "清除本机登录凭证", onLogout)
+                SettingsRow(Icons.Outlined.Person, "注销账户", "删除账户及学习数据", onClick = { deleteDialog = true })
+                Spacer(Modifier.height(16.dp))
+                Text("额度流水", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                ledger.take(10).forEach { item ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(item.entryType, style = MaterialTheme.typography.bodySmall)
+                        Text("${if (item.amount >= 0) "+" else ""}${item.amount}", style = MaterialTheme.typography.bodySmall, color = if (item.amount >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
         }
+    }
+    if (passwordDialog) {
+        AlertDialog(
+            onDismissRequest = { passwordDialog = false },
+            title = { Text("修改密码") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(currentPassword, { currentPassword = it }, label = { Text("当前密码") })
+                    OutlinedTextField(newPassword, { newPassword = it }, label = { Text("新密码") })
+                }
+            },
+            confirmButton = { TextButton(onClick = { onChangePassword(currentPassword, newPassword); passwordDialog = false }) { Text("确认") } },
+            dismissButton = { TextButton(onClick = { passwordDialog = false }) { Text("取消") } },
+        )
+    }
+    if (deleteDialog) {
+        AlertDialog(
+            onDismissRequest = { deleteDialog = false },
+            title = { Text("确认注销账户？") },
+            text = { Text("账户、会话和学习记录将被删除。") },
+            confirmButton = { TextButton(onClick = { onDeleteAccount(); deleteDialog = false }) { Text("注销") } },
+            dismissButton = { TextButton(onClick = { deleteDialog = false }) { Text("取消") } },
+        )
     }
 }
 
 @Composable
-private fun SettingsRow(icon: ImageVector, title: String, subtitle: String) {
+private fun SettingsRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit = {}) {
     Row(
-        modifier = Modifier.fillMaxWidth().height(72.dp).clickable(onClick = {}),
+        modifier = Modifier.fillMaxWidth().height(72.dp).clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
