@@ -8,19 +8,19 @@
 2. 等待 Gradle 同步完成。
 3. 选择 API 27 或更高版本的设备，运行 `app`。
 
-默认连接已部署的 API：
+默认连接已部署的 HTTPS API：
 
-- API：`http://82.158.229.157:8000/api/`
-- 接口文档：`http://82.158.229.157:8000/docs`
-- 健康检查：`http://82.158.229.157:8000/health`
+- API：`https://qingkui-api.82-158-229-157.sslip.io/api/`
+- 接口文档：`https://qingkui-api.82-158-229-157.sslip.io/docs`
+- 健康检查：`https://qingkui-api.82-158-229-157.sslip.io/health`
 
-如需切回本地模拟器后端，可在构建时覆盖地址：
+使用 `QINGKUI_ENV` 在 `development`、`test`、`pilot`、`production` 四套配置间选择：
 
 ```powershell
-.\gradlew.bat :app:installDebug -PQINGKUI_API_BASE_URL=http://10.0.2.2:8000/api/
+.\gradlew.bat :app:installDebug -PQINGKUI_ENV=development
 ```
 
-当前部署地址使用 HTTP，正式发布前建议配置 HTTPS。release 包仅对白名单中的部署地址允许明文请求。
+地址定义在 `config/environments/*.properties`。Debug 可连接本地 HTTP；Release 始终使用 pilot/production HTTPS，主清单不包含生产 HTTP 白名单。
 
 命令行构建：
 

@@ -1,12 +1,37 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val qingkuiApiBaseUrl = providers.gradleProperty("QINGKUI_API_BASE_URL")
-    .orElse("http://82.158.229.157:8000/api/")
+val qingkuiEnvironment = providers.gradleProperty("QINGKUI_ENV")
+    .orElse("production")
     .get()
+val supportedEnvironments = setOf("development", "test", "pilot", "production")
+require(qingkuiEnvironment in supportedEnvironments) {
+    "QINGKUI_ENV must be one of ${supportedEnvironments.joinToString()}"
+}
+
+fun loadEnvironment(name: String): Properties {
+    val file = rootProject.file("config/environments/$name.properties")
+    require(file.isFile) { "Missing Android environment config: $file" }
+    return Properties().apply { file.inputStream().use(::load) }
+}
+
+val environmentConfig = loadEnvironment(qingkuiEnvironment)
+val qingkuiApiBaseUrl = providers.gradleProperty("QINGKUI_API_BASE_URL")
+    .orElse(environmentConfig.getProperty("apiBaseUrl"))
+    .get()
+val productionApiBaseUrl = loadEnvironment("production").getProperty("apiBaseUrl")
+val releaseApiBaseUrl = when (qingkuiEnvironment) {
+    "pilot", "production" -> qingkuiApiBaseUrl
+    else -> productionApiBaseUrl
+}
+require(releaseApiBaseUrl.startsWith("https://")) {
+    "Release API base URL must use HTTPS: $releaseApiBaseUrl"
+}
 
 android {
     namespace = "cn.qingkui.app"
@@ -27,6 +52,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
