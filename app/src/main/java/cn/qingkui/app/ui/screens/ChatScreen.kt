@@ -284,7 +284,7 @@ private fun PromptComposer(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (compact) 210.dp else 184.dp)
+            .height(if (compact) 226.dp else 200.dp)
             .padding(
                 start = if (compact) 20.dp else 40.dp,
                 end = if (compact) 20.dp else 40.dp,
@@ -299,7 +299,7 @@ private fun PromptComposer(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().height(24.dp),
+                modifier = Modifier.fillMaxWidth().height(40.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
