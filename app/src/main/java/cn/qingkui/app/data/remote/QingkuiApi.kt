@@ -88,6 +88,39 @@ interface QingkuiApi {
     @GET("credits/ledger")
     suspend fun creditLedger(@Query("limit") limit: Int = 100): List<CreditLedgerDto>
 
+    @GET("credits/campaigns")
+    suspend fun creditCampaigns(): List<cn.qingkui.app.data.remote.dto.CreditCampaignDto>
+
+    @GET("credits/redemptions")
+    suspend fun creditRedemptions(@Query("limit") limit: Int = 50): List<cn.qingkui.app.data.remote.dto.CreditRedemptionDto>
+
+    @POST("credits/redeem")
+    suspend fun redeemCreditCode(@Body body: cn.qingkui.app.data.remote.dto.CreditRedeemRequest): cn.qingkui.app.data.remote.dto.CreditRedeemResponseDto
+
+    @GET("organizations/me")
+    suspend fun organizations(): cn.qingkui.app.data.remote.dto.OrganizationMeDto
+
+    @GET("organizations/schools/{id}/classes")
+    suspend fun schoolClasses(@Path("id") schoolId: String): List<cn.qingkui.app.data.remote.dto.SchoolClassDto>
+
+    @POST("organizations/invites/redeem")
+    suspend fun redeemOrganizationInvite(@Body body: cn.qingkui.app.data.remote.dto.OrganizationInviteRedeemDto): cn.qingkui.app.data.remote.dto.OrganizationJoinDto
+
+    @DELETE("organizations/schools/{id}/membership")
+    suspend fun leaveSchool(@Path("id") schoolId: String): retrofit2.Response<Unit>
+
+    @GET("organizations/classes/{id}/overview")
+    suspend fun classOverview(@Path("id") classId: String): cn.qingkui.app.data.remote.dto.ClassOverviewDto
+
+    @GET("contributions")
+    suspend fun contributions(@Query("limit") limit: Int = 50): List<cn.qingkui.app.data.remote.dto.ContributionDto>
+
+    @POST("contributions")
+    suspend fun createContribution(@Body body: cn.qingkui.app.data.remote.dto.ContributionCreateDto): cn.qingkui.app.data.remote.dto.ContributionDto
+
+    @DELETE("contributions/{id}")
+    suspend fun deleteContribution(@Path("id") contributionId: String): retrofit2.Response<Unit>
+
     @GET("knowledge/search")
     suspend fun search(@Query("q") query: String): List<KnowledgeNodeDto>
 

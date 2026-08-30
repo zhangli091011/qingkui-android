@@ -42,6 +42,98 @@ data class AuthResponse(
 
 data class CreditDto(val balance: Int)
 
+data class CreditCampaignDto(
+    val id: String,
+    val name: String,
+    val amount: Int,
+    @SerializedName("school_id") val schoolId: String?,
+    val status: String,
+    @SerializedName("starts_at") val startsAt: String,
+    @SerializedName("ends_at") val endsAt: String,
+    @SerializedName("max_redemptions") val maxRedemptions: Int,
+    @SerializedName("redemption_count") val redemptionCount: Int,
+    @SerializedName("per_user_limit") val perUserLimit: Int,
+)
+
+data class CreditRedemptionDto(
+    val id: String,
+    @SerializedName("campaign_id") val campaignId: String,
+    @SerializedName("campaign_name") val campaignName: String,
+    val amount: Int,
+    @SerializedName("created_at") val createdAt: String,
+)
+
+data class CreditRedeemRequest(val code: String)
+data class CreditRedeemResponseDto(
+    @SerializedName("campaign_id") val campaignId: String,
+    @SerializedName("campaign_name") val campaignName: String,
+    val amount: Int,
+    val balance: Int,
+)
+
+data class SchoolDto(val id: String, val name: String, val code: String, val status: String)
+data class SchoolMembershipDto(
+    val id: String,
+    @SerializedName("school_id") val schoolId: String,
+    val role: String,
+    val status: String,
+    @SerializedName("joined_at") val joinedAt: String,
+    val school: SchoolDto,
+)
+data class OrganizationMeDto(val memberships: List<SchoolMembershipDto>)
+data class SchoolClassDto(
+    val id: String,
+    @SerializedName("school_id") val schoolId: String,
+    val name: String,
+    val grade: String?,
+    @SerializedName("academic_year") val academicYear: String,
+    val status: String,
+)
+data class OrganizationInviteRedeemDto(val code: String)
+data class OrganizationJoinDto(
+    val school: SchoolDto,
+    @SerializedName("school_role") val schoolRole: String,
+    val classroom: SchoolClassDto?,
+    val joined: Boolean,
+)
+data class ClassStudentOverviewDto(
+    @SerializedName("anonymous_id") val anonymousId: String,
+    @SerializedName("joined_at") val joinedAt: String,
+    @SerializedName("last_activity_at") val lastActivityAt: String?,
+    val questions: Int,
+    val mistakes: Int,
+    @SerializedName("verified_nodes") val verifiedNodes: Int,
+)
+data class ClassOverviewDto(
+    val classroom: SchoolClassDto,
+    @SerializedName("student_count") val studentCount: Int,
+    @SerializedName("active_7d_students") val active7dStudents: Int,
+    val questions: Int,
+    val mistakes: Int,
+    @SerializedName("verified_nodes") val verifiedNodes: Int,
+    val students: List<ClassStudentOverviewDto>,
+)
+
+data class ContributionCreateDto(
+    @SerializedName("contribution_type") val contributionType: String,
+    val title: String,
+    val content: String,
+    @SerializedName("source_reference") val sourceReference: String?,
+)
+data class ContributionDto(
+    val id: String,
+    @SerializedName("school_id") val schoolId: String?,
+    @SerializedName("contribution_type") val contributionType: String,
+    val title: String,
+    val content: String,
+    @SerializedName("source_reference") val sourceReference: String?,
+    val status: String,
+    @SerializedName("review_note") val reviewNote: String?,
+    @SerializedName("reward_amount") val rewardAmount: Int,
+    @SerializedName("reward_status") val rewardStatus: String,
+    @SerializedName("created_at") val createdAt: String,
+)
+
 data class KnowledgeNodeDto(
     val id: String,
     val name: String,

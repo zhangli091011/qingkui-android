@@ -178,6 +178,107 @@ class AppViewModel(
             devicesTask.await() to feedbackTask.await()
         }
         _uiState.update { it.copy(deviceSessions = deviceSessions, feedbackItems = feedbackItems) }
+        refreshCommunityData()
+    }
+
+    private suspend fun refreshCommunityData() {
+        _uiState.update { it.copy(communityLoading = true) }
+        val organizations = runCatching { repository.schoolMemberships() }
+        val memberships = organizations.getOrDefault(emptyList())
+        val schoolId = memberships.firstOrNull()?.schoolId
+        val classes = if (schoolId != null) runCatching { repository.schoolClasses(schoolId) } else Result.success(emptyList())
+        val campaigns = runCatching { repository.creditCampaigns() }
+        val redemptions = if (campaigns.isSuccess) runCatching { repository.creditRedemptions() } else Result.success(emptyList())
+        val contributions = runCatching { repository.contributions() }
+        _uiState.update { state ->
+            state.copy(
+                organizationsAvailable = featureAvailability(organizations) ?: state.organizationsAvailable,
+                schoolMemberships = memberships,
+                schoolClasses = classes.getOrDefault(emptyList()),
+                creditCampaignsAvailable = featureAvailability(campaigns) ?: state.creditCampaignsAvailable,
+                creditCampaigns = campaigns.getOrDefault(emptyList()),
+                creditRedemptions = redemptions.getOrDefault(emptyList()),
+                contributionsAvailable = featureAvailability(contributions) ?: state.contributionsAvailable,
+                contributions = contributions.getOrDefault(emptyList()),
+                classOverview = null,
+                communityLoading = false,
+            )
+        }
+    }
+
+    fun refreshCommunity() {
+        if (!_uiState.value.authenticated) return
+        viewModelScope.launch { refreshCommunityData() }
+    }
+
+    fun redeemOrganizationInvite(code: String) {
+        if (code.trim().length < 8) {
+            _uiState.update { it.copy(errorMessage = "请输入有效的邀请码") }
+            return
+        }
+        viewModelScope.launch {
+            try {
+                repository.redeemOrganizationInvite(code)
+                refreshCommunityData()
+                _uiState.update { it.copy(errorMessage = "已加入学校或班级") }
+            } catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun leaveSchool(schoolId: String) {
+        viewModelScope.launch {
+            try {
+                repository.leaveSchool(schoolId)
+                refreshCommunityData()
+                _uiState.update { it.copy(errorMessage = "已退出学校组织") }
+            } catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun loadClassOverview(classId: String) {
+        viewModelScope.launch {
+            try {
+                val overview = repository.classOverview(classId)
+                _uiState.update { it.copy(classOverview = overview) }
+            } catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun redeemCreditCode(code: String) {
+        if (code.trim().length < 8) {
+            _uiState.update { it.copy(errorMessage = "请输入有效的兑换码") }
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val result = repository.redeemCreditCode(code)
+                _uiState.update { it.copy(credits = result.balance, errorMessage = "已兑换 ${result.amount} 额度") }
+                refreshCommunityData()
+            } catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun submitContribution(type: String, title: String, content: String, sourceReference: String?) {
+        if (title.trim().length < 2 || content.trim().length < 20) {
+            _uiState.update { it.copy(errorMessage = "标题至少 2 个字，内容至少 20 个字") }
+            return
+        }
+        viewModelScope.launch {
+            try {
+                repository.submitContribution(type, title, content, sourceReference)
+                refreshCommunityData()
+                _uiState.update { it.copy(errorMessage = "投稿已提交，等待审核") }
+            } catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun deleteContribution(contributionId: String) {
+        viewModelScope.launch {
+            try {
+                repository.deleteContribution(contributionId)
+                refreshCommunityData()
+            } catch (error: Exception) { handleApiError(error) { it } }
+        }
     }
 
     fun selectDestination(destination: AppDestination) {
@@ -827,6 +928,12 @@ class AppViewModel(
                 AppViewModel(AppRepositoryProvider.get(context)) as T
         }
     }
+}
+
+private fun featureAvailability(result: Result<*>): Boolean? = when {
+    result.isSuccess -> true
+    (result.exceptionOrNull() as? ApiFailureException)?.statusCode == 404 -> false
+    else -> null
 }
 
 private data class Sextuple<A, B, C, D, E, F>(

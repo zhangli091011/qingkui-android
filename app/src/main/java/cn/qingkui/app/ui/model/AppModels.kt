@@ -183,6 +183,76 @@ data class FeedbackItem(
 )
 
 @Immutable
+data class SchoolMembershipItem(
+    val id: String,
+    val schoolId: String,
+    val schoolName: String,
+    val schoolCode: String,
+    val role: String,
+    val joinedAt: String,
+)
+
+@Immutable
+data class SchoolClassItem(
+    val id: String,
+    val schoolId: String,
+    val name: String,
+    val grade: String,
+    val academicYear: String,
+)
+
+@Immutable
+data class ClassStudentOverviewItem(
+    val anonymousId: String,
+    val lastActivityAt: String?,
+    val questions: Int,
+    val mistakes: Int,
+    val verifiedNodes: Int,
+)
+
+@Immutable
+data class ClassOverviewItem(
+    val classroom: SchoolClassItem,
+    val studentCount: Int,
+    val active7dStudents: Int,
+    val questions: Int,
+    val mistakes: Int,
+    val verifiedNodes: Int,
+    val students: List<ClassStudentOverviewItem>,
+)
+
+@Immutable
+data class CreditCampaignItem(
+    val id: String,
+    val name: String,
+    val amount: Int,
+    val schoolId: String?,
+    val endsAt: String,
+    val remaining: Int,
+)
+
+@Immutable
+data class CreditRedemptionItem(
+    val id: String,
+    val campaignId: String,
+    val campaignName: String,
+    val amount: Int,
+    val createdAt: String,
+)
+
+@Immutable
+data class ContributionItem(
+    val id: String,
+    val type: String,
+    val title: String,
+    val status: String,
+    val reviewNote: String?,
+    val rewardAmount: Int,
+    val rewardStatus: String,
+    val createdAt: String,
+)
+
+@Immutable
 data class MistakeDraftItem(
     val id: String,
     val imagePath: String,
@@ -298,6 +368,16 @@ data class AppUiState(
     val ledger: List<CreditLedgerItem> = emptyList(),
     val deviceSessions: List<DeviceSessionItem> = emptyList(),
     val feedbackItems: List<FeedbackItem> = emptyList(),
+    val organizationsAvailable: Boolean? = null,
+    val schoolMemberships: List<SchoolMembershipItem> = emptyList(),
+    val schoolClasses: List<SchoolClassItem> = emptyList(),
+    val classOverview: ClassOverviewItem? = null,
+    val creditCampaignsAvailable: Boolean? = null,
+    val creditCampaigns: List<CreditCampaignItem> = emptyList(),
+    val creditRedemptions: List<CreditRedemptionItem> = emptyList(),
+    val contributionsAvailable: Boolean? = null,
+    val contributions: List<ContributionItem> = emptyList(),
+    val communityLoading: Boolean = false,
     val selectedNodeDetail: KnowledgeNode? = null,
     val noteDraft: String = "",
     val mistakeDrafts: List<MistakeDraftItem> = emptyList(),

@@ -236,6 +236,22 @@ fun QingkuiApp() {
                         onRefreshAccount = viewModel::refreshAccount,
                         onRevokeDevice = viewModel::revokeDeviceSession,
                         onSubmitFeedback = viewModel::submitFeedback,
+                        organizationsAvailable = uiState.organizationsAvailable,
+                        schoolMemberships = uiState.schoolMemberships,
+                        schoolClasses = uiState.schoolClasses,
+                        classOverview = uiState.classOverview,
+                        creditCampaignsAvailable = uiState.creditCampaignsAvailable,
+                        creditCampaigns = uiState.creditCampaigns,
+                        creditRedemptions = uiState.creditRedemptions,
+                        contributionsAvailable = uiState.contributionsAvailable,
+                        contributions = uiState.contributions,
+                        onRefreshCommunity = viewModel::refreshCommunity,
+                        onRedeemInvite = viewModel::redeemOrganizationInvite,
+                        onLeaveSchool = viewModel::leaveSchool,
+                        onLoadClassOverview = viewModel::loadClassOverview,
+                        onRedeemCreditCode = viewModel::redeemCreditCode,
+                        onSubmitContribution = viewModel::submitContribution,
+                        onDeleteContribution = viewModel::deleteContribution,
                     )
                 }
             }

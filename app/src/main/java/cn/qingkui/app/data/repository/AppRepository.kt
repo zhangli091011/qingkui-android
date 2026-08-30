@@ -40,6 +40,11 @@ import cn.qingkui.app.ui.model.ConversationSummary
 import cn.qingkui.app.ui.model.CreditLedgerItem
 import cn.qingkui.app.ui.model.DeviceSessionItem
 import cn.qingkui.app.ui.model.FeedbackItem
+import cn.qingkui.app.ui.model.ClassOverviewItem
+import cn.qingkui.app.ui.model.ClassStudentOverviewItem
+import cn.qingkui.app.ui.model.ContributionItem
+import cn.qingkui.app.ui.model.CreditCampaignItem
+import cn.qingkui.app.ui.model.CreditRedemptionItem
 import cn.qingkui.app.ui.model.KnowledgeKind
 import cn.qingkui.app.ui.model.KnowledgeNode
 import cn.qingkui.app.ui.model.KnowledgeRelation
@@ -64,6 +69,8 @@ import cn.qingkui.app.ui.model.QaMode
 import cn.qingkui.app.ui.model.QaClarification
 import cn.qingkui.app.ui.model.QaClarificationOption
 import cn.qingkui.app.ui.model.RelationType
+import cn.qingkui.app.ui.model.SchoolClassItem
+import cn.qingkui.app.ui.model.SchoolMembershipItem
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import kotlinx.coroutines.delay
@@ -97,6 +104,7 @@ data class QaAnswer(
 
 data class MistakeAnalysisOutcome(val balance: Int)
 data class UnderstandingCheckOutcome(val passed: Boolean, val status: KnowledgeStatus)
+data class CreditRedeemOutcome(val campaignName: String, val amount: Int, val balance: Int)
 
 class ApiFailureException(val statusCode: Int?, message: String) : Exception(message)
 
@@ -114,6 +122,17 @@ interface AppRepository {
     suspend fun revokeDeviceSession(sessionId: String)
     suspend fun feedback(): List<FeedbackItem>
     suspend fun submitFeedback(category: String, content: String)
+    suspend fun schoolMemberships(): List<SchoolMembershipItem>
+    suspend fun schoolClasses(schoolId: String): List<SchoolClassItem>
+    suspend fun redeemOrganizationInvite(code: String)
+    suspend fun leaveSchool(schoolId: String)
+    suspend fun classOverview(classId: String): ClassOverviewItem
+    suspend fun creditCampaigns(): List<CreditCampaignItem>
+    suspend fun creditRedemptions(): List<CreditRedemptionItem>
+    suspend fun redeemCreditCode(code: String): CreditRedeemOutcome
+    suspend fun contributions(): List<ContributionItem>
+    suspend fun submitContribution(type: String, title: String, content: String, sourceReference: String?)
+    suspend fun deleteContribution(contributionId: String)
     suspend fun graph(centerId: String = "quadratic_function"): GraphData
     suspend fun nodeDetail(nodeId: String): KnowledgeNode
     suspend fun search(query: String): GraphData
@@ -242,6 +261,76 @@ class NetworkAppRepository(
     override suspend fun submitFeedback(category: String, content: String) = apiCall {
         api.submitFeedback(FeedbackCreate(category, content.trim(), null))
         Unit
+    }
+
+    override suspend fun schoolMemberships(): List<SchoolMembershipItem> = apiCall {
+        api.organizations().memberships.map { item ->
+            SchoolMembershipItem(item.id, item.schoolId, item.school.name, item.school.code, item.role, item.joinedAt.displayDateTime())
+        }
+    }
+
+    override suspend fun schoolClasses(schoolId: String): List<SchoolClassItem> = apiCall {
+        api.schoolClasses(schoolId).map { item ->
+            SchoolClassItem(item.id, item.schoolId, item.name, item.grade.orEmpty(), item.academicYear)
+        }
+    }
+
+    override suspend fun redeemOrganizationInvite(code: String) = apiCall {
+        api.redeemOrganizationInvite(cn.qingkui.app.data.remote.dto.OrganizationInviteRedeemDto(code.trim()))
+        Unit
+    }
+
+    override suspend fun leaveSchool(schoolId: String) = apiCall {
+        val response = api.leaveSchool(schoolId)
+        if (!response.isSuccessful) throw responseFailure(response.code(), response.errorBody()?.charStream())
+    }
+
+    override suspend fun classOverview(classId: String): ClassOverviewItem = apiCall {
+        val value = api.classOverview(classId)
+        ClassOverviewItem(
+            classroom = value.classroom.toSchoolClassItem(),
+            studentCount = value.studentCount,
+            active7dStudents = value.active7dStudents,
+            questions = value.questions,
+            mistakes = value.mistakes,
+            verifiedNodes = value.verifiedNodes,
+            students = value.students.map { student ->
+                ClassStudentOverviewItem(student.anonymousId, student.lastActivityAt?.displayDateTime(), student.questions, student.mistakes, student.verifiedNodes)
+            },
+        )
+    }
+
+    override suspend fun creditCampaigns(): List<CreditCampaignItem> = apiCall {
+        api.creditCampaigns().map { item ->
+            CreditCampaignItem(item.id, item.name, item.amount, item.schoolId, item.endsAt.displayDateTime(), (item.maxRedemptions - item.redemptionCount).coerceAtLeast(0))
+        }
+    }
+
+    override suspend fun creditRedemptions(): List<CreditRedemptionItem> = apiCall {
+        api.creditRedemptions().map { item ->
+            CreditRedemptionItem(item.id, item.campaignId, item.campaignName, item.amount, item.createdAt.displayDateTime())
+        }
+    }
+
+    override suspend fun redeemCreditCode(code: String): CreditRedeemOutcome = apiCall {
+        val result = api.redeemCreditCode(cn.qingkui.app.data.remote.dto.CreditRedeemRequest(code.trim()))
+        CreditRedeemOutcome(result.campaignName, result.amount, result.balance)
+    }
+
+    override suspend fun contributions(): List<ContributionItem> = apiCall {
+        api.contributions().map { it.toContributionItem() }
+    }
+
+    override suspend fun submitContribution(type: String, title: String, content: String, sourceReference: String?) = apiCall {
+        api.createContribution(
+            cn.qingkui.app.data.remote.dto.ContributionCreateDto(type, title.trim(), content.trim(), sourceReference?.trim()?.ifBlank { null }),
+        )
+        Unit
+    }
+
+    override suspend fun deleteContribution(contributionId: String) = apiCall {
+        val response = api.deleteContribution(contributionId)
+        if (!response.isSuccessful) throw responseFailure(response.code(), response.errorBody()?.charStream())
     }
 
     override suspend fun graph(centerId: String): GraphData = apiCall {
@@ -745,7 +834,28 @@ class NetworkAppRepository(
         description = definition,
         evidence = "$subject · $grade · $chapter",
     )
+
+    private fun cn.qingkui.app.data.remote.dto.SchoolClassDto.toSchoolClassItem() = SchoolClassItem(
+        id = id,
+        schoolId = schoolId,
+        name = name,
+        grade = grade.orEmpty(),
+        academicYear = academicYear,
+    )
+
+    private fun cn.qingkui.app.data.remote.dto.ContributionDto.toContributionItem() = ContributionItem(
+        id = id,
+        type = contributionType,
+        title = title,
+        status = status,
+        reviewNote = reviewNote,
+        rewardAmount = rewardAmount,
+        rewardStatus = rewardStatus,
+        createdAt = createdAt.displayDateTime(),
+    )
 }
+
+private fun String.displayDateTime(): String = replace('T', ' ').take(16)
 
 private fun KnowledgeStatus.apiValue(): String = when (this) {
     KnowledgeStatus.Unexplored -> "unexplored"

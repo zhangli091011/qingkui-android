@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.DataUsage
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Feedback
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PrivacyTip
@@ -41,6 +42,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import cn.qingkui.app.ui.model.DeviceSessionItem
 import cn.qingkui.app.ui.model.FeedbackItem
+import cn.qingkui.app.ui.model.ClassOverviewItem
+import cn.qingkui.app.ui.model.ContributionItem
+import cn.qingkui.app.ui.model.CreditCampaignItem
+import cn.qingkui.app.ui.model.CreditRedemptionItem
+import cn.qingkui.app.ui.model.SchoolClassItem
+import cn.qingkui.app.ui.model.SchoolMembershipItem
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,6 +75,22 @@ fun AccountScreen(
     onRefreshAccount: () -> Unit = {},
     onRevokeDevice: (String) -> Unit = {},
     onSubmitFeedback: (String, String) -> Unit = { _, _ -> },
+    organizationsAvailable: Boolean? = null,
+    schoolMemberships: List<SchoolMembershipItem> = emptyList(),
+    schoolClasses: List<SchoolClassItem> = emptyList(),
+    classOverview: ClassOverviewItem? = null,
+    creditCampaignsAvailable: Boolean? = null,
+    creditCampaigns: List<CreditCampaignItem> = emptyList(),
+    creditRedemptions: List<CreditRedemptionItem> = emptyList(),
+    contributionsAvailable: Boolean? = null,
+    contributions: List<ContributionItem> = emptyList(),
+    onRefreshCommunity: () -> Unit = {},
+    onRedeemInvite: (String) -> Unit = {},
+    onLeaveSchool: (String) -> Unit = {},
+    onLoadClassOverview: (String) -> Unit = {},
+    onRedeemCreditCode: (String) -> Unit = {},
+    onSubmitContribution: (String, String, String, String?) -> Unit = { _, _, _, _ -> },
+    onDeleteContribution: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var passwordDialog by remember { mutableStateOf(false) }
@@ -81,6 +104,7 @@ fun AccountScreen(
     var dataDialog by remember { mutableStateOf(false) }
     var privacyDialog by remember { mutableStateOf(false) }
     var minorDialog by remember { mutableStateOf(false) }
+    var communityDialog by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -160,6 +184,12 @@ fun AccountScreen(
             SettingsRow(Icons.Outlined.DataUsage, "数据说明", "学习记录、错题和删除范围", onClick = { dataDialog = true })
             SettingsRow(Icons.Outlined.PrivacyTip, "隐私说明", "账户、图片与模型调用边界", onClick = { privacyDialog = true })
             SettingsRow(Icons.Outlined.School, "未成年人及试点", "授权、教师可见范围与退出方式", onClick = { minorDialog = true })
+            SettingsRow(Icons.Outlined.Groups, "校园与共建", "学校班级、活动额度与内容投稿", onClick = {
+                if (authenticated) {
+                    onRefreshCommunity()
+                    communityDialog = true
+                } else onLogin()
+            })
             SettingsRow(Icons.Outlined.Feedback, "问题反馈", "提交反馈并查看处理状态", onClick = {
                 if (authenticated) {
                     onRefreshAccount()
@@ -318,6 +348,26 @@ fun AccountScreen(
                 InfoSection("退出试点", "参与者可联系试点负责人停止参与，并在应用中删除个人内容或注销账户。试点管理员可按批准名单执行数据清理。"),
             ),
             onDismiss = { minorDialog = false },
+        )
+    }
+    if (communityDialog) {
+        CommunityCenterDialog(
+            organizationsAvailable = organizationsAvailable,
+            memberships = schoolMemberships,
+            classes = schoolClasses,
+            classOverview = classOverview,
+            creditCampaignsAvailable = creditCampaignsAvailable,
+            campaigns = creditCampaigns,
+            redemptions = creditRedemptions,
+            contributionsAvailable = contributionsAvailable,
+            contributions = contributions,
+            onRedeemInvite = onRedeemInvite,
+            onLeaveSchool = onLeaveSchool,
+            onLoadOverview = onLoadClassOverview,
+            onRedeemCode = onRedeemCreditCode,
+            onSubmitContribution = onSubmitContribution,
+            onDeleteContribution = onDeleteContribution,
+            onDismiss = { communityDialog = false },
         )
     }
 }

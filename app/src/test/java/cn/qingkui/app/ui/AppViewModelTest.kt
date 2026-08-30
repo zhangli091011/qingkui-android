@@ -10,6 +10,10 @@ import cn.qingkui.app.ui.model.ChatMessage
 import cn.qingkui.app.ui.model.CreditLedgerItem
 import cn.qingkui.app.ui.model.DeviceSessionItem
 import cn.qingkui.app.ui.model.FeedbackItem
+import cn.qingkui.app.ui.model.ClassOverviewItem
+import cn.qingkui.app.ui.model.ContributionItem
+import cn.qingkui.app.ui.model.CreditCampaignItem
+import cn.qingkui.app.ui.model.CreditRedemptionItem
 import cn.qingkui.app.ui.model.LearningItem
 import cn.qingkui.app.ui.model.LearningFilter
 import cn.qingkui.app.ui.model.KnowledgeStatus
@@ -17,6 +21,8 @@ import cn.qingkui.app.ui.model.KnowledgeCatalogScope
 import cn.qingkui.app.ui.model.KnowledgeTreeChapter
 import cn.qingkui.app.ui.model.KnowledgeTreeNode
 import cn.qingkui.app.ui.model.KnowledgeTreeSection
+import cn.qingkui.app.ui.model.SchoolClassItem
+import cn.qingkui.app.ui.model.SchoolMembershipItem
 import cn.qingkui.app.ui.model.MessageAuthor
 import cn.qingkui.app.ui.model.MistakeDraftItem
 import cn.qingkui.app.ui.model.MistakeItem
@@ -41,6 +47,30 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelTest {
+    @Test
+    fun communityActionsUseRepositoryAndRefreshBalance() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository()
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+
+            viewModel.redeemOrganizationInvite("QK-invite-123")
+            advanceUntilIdle()
+            viewModel.redeemCreditCode("QKC-credit-123")
+            advanceUntilIdle()
+            viewModel.submitContribution("explanation", "补充知识", "这是一段足够长的知识补充内容，用于测试投稿提交链路。", null)
+            advanceUntilIdle()
+
+            assertEquals(listOf("QK-invite-123"), repository.redeemedInvites)
+            assertEquals(listOf("QKC-credit-123"), repository.redeemedCodes)
+            assertEquals(1290, viewModel.uiState.value.credits)
+            assertEquals(listOf("补充知识"), repository.submittedContributionTitles)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     @Test
     fun selectingKnowledgeScopeLoadsItsChapterTree() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -402,6 +432,9 @@ private class FakeRepository(
     val mistakeResponses = mutableListOf<List<MistakeItem>>()
     var mistakeCalls = 0
     val submittedChecks = mutableListOf<Pair<String, String>>()
+    val redeemedInvites = mutableListOf<String>()
+    val redeemedCodes = mutableListOf<String>()
+    val submittedContributionTitles = mutableListOf<String>()
     val requestedKnowledgeScopes = mutableListOf<KnowledgeCatalogScope>()
 
     override suspend fun hasSession() = authenticated
@@ -425,6 +458,20 @@ private class FakeRepository(
     override suspend fun submitFeedback(category: String, content: String) {
         feedbackSubmissions += category to content
     }
+    override suspend fun schoolMemberships(): List<SchoolMembershipItem> = emptyList()
+    override suspend fun schoolClasses(schoolId: String): List<SchoolClassItem> = emptyList()
+    override suspend fun redeemOrganizationInvite(code: String) { redeemedInvites += code }
+    override suspend fun leaveSchool(schoolId: String) = Unit
+    override suspend fun classOverview(classId: String): ClassOverviewItem = throw UnsupportedOperationException()
+    override suspend fun creditCampaigns(): List<CreditCampaignItem> = emptyList()
+    override suspend fun creditRedemptions(): List<CreditRedemptionItem> = emptyList()
+    override suspend fun redeemCreditCode(code: String): cn.qingkui.app.data.repository.CreditRedeemOutcome {
+        redeemedCodes += code
+        return cn.qingkui.app.data.repository.CreditRedeemOutcome("测试活动", 10, answerBalance + 10)
+    }
+    override suspend fun contributions(): List<ContributionItem> = emptyList()
+    override suspend fun submitContribution(type: String, title: String, content: String, sourceReference: String?) { submittedContributionTitles += title }
+    override suspend fun deleteContribution(contributionId: String) = Unit
     override suspend fun graph(centerId: String) = GraphData(emptyList(), emptyList(), null)
     override suspend fun nodeDetail(nodeId: String) = throw UnsupportedOperationException()
     override suspend fun search(query: String) = GraphData(emptyList(), emptyList(), null)
