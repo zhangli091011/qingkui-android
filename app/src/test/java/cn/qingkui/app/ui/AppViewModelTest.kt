@@ -215,6 +215,29 @@ class AppViewModelTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun mistakeRecoveryActionsCallRepositoryAndDeleteFromState() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository()
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+
+            viewModel.retryMistakeDraft("draft-1")
+            viewModel.cancelMistakeOcr("mistake-1", "task-1")
+            viewModel.retryMistakeOcr("mistake-1", "task-1")
+            viewModel.deleteMistake("mistake-1")
+            advanceUntilIdle()
+
+            assertEquals(listOf("draft-1"), repository.retriedDrafts)
+            assertEquals(listOf("mistake-1" to "task-1"), repository.cancelledOcrTasks)
+            assertEquals(listOf("mistake-1" to "task-1"), repository.retriedOcrTasks)
+            assertEquals(listOf("mistake-1"), repository.deletedMistakes)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
 }
 
 private class FakeRepository(
@@ -227,6 +250,10 @@ private class FakeRepository(
     val analyzedMistakes = mutableListOf<String>()
     var lastLearningFilter = LearningFilter.Recent
     var lastSessionQuery: String? = null
+    val retriedDrafts = mutableListOf<String>()
+    val cancelledOcrTasks = mutableListOf<Pair<String, String>>()
+    val retriedOcrTasks = mutableListOf<Pair<String, String>>()
+    val deletedMistakes = mutableListOf<String>()
 
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null
@@ -302,6 +329,11 @@ private class FakeRepository(
         studentWork: String,
         questionGoal: String,
     ) = Unit
+    override suspend fun retryMistakeDraft(draftId: String) { retriedDrafts += draftId }
+    override suspend fun deleteMistakeDraft(draftId: String) = Unit
+    override suspend fun cancelMistakeOcr(mistakeId: String, taskId: String) { cancelledOcrTasks += mistakeId to taskId }
+    override suspend fun retryMistakeOcr(mistakeId: String, taskId: String) { retriedOcrTasks += mistakeId to taskId }
+    override suspend fun deleteMistake(mistakeId: String) { deletedMistakes += mistakeId }
     override suspend fun confirmMistakeOcr(mistakeId: String, taskId: String, correctedText: String) = Unit
     override suspend fun analyzeMistake(mistakeId: String): MistakeAnalysisOutcome {
         analyzedMistakes += mistakeId

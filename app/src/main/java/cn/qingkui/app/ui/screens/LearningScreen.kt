@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +36,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material.icons.outlined.AddAPhoto
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -70,6 +72,11 @@ fun LearningScreen(
     onShowMistakes: () -> Unit,
     onCaptureMistake: () -> Unit,
     onRefreshMistakes: () -> Unit,
+    onRetryDraft: (String) -> Unit,
+    onDeleteDraft: (String) -> Unit,
+    onCancelOcr: (String, String) -> Unit,
+    onRetryOcr: (String, String) -> Unit,
+    onDeleteMistake: (String) -> Unit,
     onConfirmOcr: (String, String, String) -> Unit,
     onAnalyzeMistake: (String) -> Unit,
     onGeneratePractice: (String) -> Unit,
@@ -102,6 +109,11 @@ fun LearningScreen(
                     loading = mistakeLoading,
                     onCapture = onCaptureMistake,
                     onRefresh = onRefreshMistakes,
+                    onRetryDraft = onRetryDraft,
+                    onDeleteDraft = onDeleteDraft,
+                    onCancelOcr = onCancelOcr,
+                    onRetryOcr = onRetryOcr,
+                    onDeleteMistake = onDeleteMistake,
                     onConfirm = onConfirmOcr,
                     onAnalyze = onAnalyzeMistake,
                     onGeneratePractice = onGeneratePractice,
@@ -207,12 +219,19 @@ private fun MistakeBookContent(
     loading: Boolean,
     onCapture: () -> Unit,
     onRefresh: () -> Unit,
+    onRetryDraft: (String) -> Unit,
+    onDeleteDraft: (String) -> Unit,
+    onCancelOcr: (String, String) -> Unit,
+    onRetryOcr: (String, String) -> Unit,
+    onDeleteMistake: (String) -> Unit,
     onConfirm: (String, String, String) -> Unit,
     onAnalyze: (String) -> Unit,
     onGeneratePractice: (String) -> Unit,
     onSubmitPractice: (String, String, String) -> Unit,
 ) {
     var editing by remember { mutableStateOf<MistakeItem?>(null) }
+    var mistakeToDelete by remember { mutableStateOf<MistakeItem?>(null) }
+    var draftToDelete by remember { mutableStateOf<MistakeDraftItem?>(null) }
     var correction by remember { mutableStateOf("") }
     var answering by remember { mutableStateOf<Pair<MistakeItem, MistakePracticeItem>?>(null) }
     var practiceAnswer by remember { mutableStateOf("") }
@@ -246,6 +265,12 @@ private fun MistakeBookContent(
                         Text(draftStatusLabel(draft.status), style = MaterialTheme.typography.bodySmall, color = if (draft.status == "failed") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
                         if (!draft.errorMessage.isNullOrBlank()) Text(draft.errorMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, maxLines = 2)
                     }
+                    if (draft.status == "failed") {
+                        TextButton(onClick = { onRetryDraft(draft.id) }) { Text("重试") }
+                    }
+                    IconButton(onClick = { draftToDelete = draft }) {
+                        Icon(Icons.Outlined.DeleteOutline, contentDescription = "删除本地草稿")
+                    }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             }
@@ -253,7 +278,12 @@ private fun MistakeBookContent(
                 Column(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(item.subject, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                        Text(ocrStatusLabel(item.ocrStatus), style = MaterialTheme.typography.bodySmall, color = if (item.ocrStatus == "failed") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(ocrStatusLabel(item.ocrStatus), style = MaterialTheme.typography.bodySmall, color = if (item.ocrStatus == "failed") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                            IconButton(onClick = { mistakeToDelete = item }) {
+                                Icon(Icons.Outlined.DeleteOutline, contentDescription = "删除错题")
+                            }
+                        }
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(item.questionText, style = MaterialTheme.typography.bodyLarge, maxLines = 5)
@@ -262,6 +292,12 @@ private fun MistakeBookContent(
                         if (item.confidence != null) Text("置信度 ${(item.confidence * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (item.requiresReview && item.ocrTaskId != null && item.ocrStatus == "succeeded") {
                             TextButton(onClick = { editing = item; correction = item.questionText }) { Text("校对确认") }
+                        }
+                        if (item.ocrTaskId != null && item.ocrStatus in setOf("queued", "recognizing")) {
+                            TextButton(onClick = { onCancelOcr(item.id, item.ocrTaskId) }) { Text("取消识别") }
+                        }
+                        if (item.ocrTaskId != null && item.ocrStatus in setOf("failed", "cancelled")) {
+                            TextButton(onClick = { onRetryOcr(item.id, item.ocrTaskId) }) { Text("重试识别") }
                         }
                         if (!item.requiresReview && item.analysisStatus != "completed") {
                             TextButton(onClick = { onAnalyze(item.id) }, enabled = !loading) { Text("分析错因") }
@@ -327,6 +363,34 @@ private fun MistakeBookContent(
                 Button(onClick = { onConfirm(current.id, current.ocrTaskId, correction); editing = null }, enabled = correction.isNotBlank()) { Text("确认") }
             },
             dismissButton = { TextButton(onClick = { editing = null }) { Text("取消") } },
+        )
+    }
+    mistakeToDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { mistakeToDelete = null },
+            title = { Text("删除这道错题？") },
+            text = { Text("错题记录、OCR 任务、练习结果和原图将一并删除，无法恢复。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteMistake(target.id)
+                    mistakeToDelete = null
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { mistakeToDelete = null }) { Text("取消") } },
+        )
+    }
+    draftToDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { draftToDelete = null },
+            title = { Text("删除本地草稿？") },
+            text = { Text("尚未完成上传的图片和题目草稿将从本机删除。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteDraft(target.id)
+                    draftToDelete = null
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { draftToDelete = null }) { Text("取消") } },
         )
     }
     val practiceTarget = answering

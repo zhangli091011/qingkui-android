@@ -124,6 +124,11 @@ interface AppRepository {
         studentWork: String,
         questionGoal: String,
     )
+    suspend fun retryMistakeDraft(draftId: String)
+    suspend fun deleteMistakeDraft(draftId: String)
+    suspend fun cancelMistakeOcr(mistakeId: String, taskId: String)
+    suspend fun retryMistakeOcr(mistakeId: String, taskId: String)
+    suspend fun deleteMistake(mistakeId: String)
     suspend fun confirmMistakeOcr(mistakeId: String, taskId: String, correctedText: String)
     suspend fun analyzeMistake(mistakeId: String): MistakeAnalysisOutcome
     suspend fun generateMistakePractice(mistakeId: String)
@@ -492,6 +497,38 @@ class NetworkAppRepository(
                 status = "waiting",
             ),
         )
+        enqueueMistakeDraft(id, ExistingWorkPolicy.KEEP)
+    }
+
+    override suspend fun retryMistakeDraft(draftId: String) {
+        val draft = draftDao.get(draftId) ?: throw ApiFailureException(404, "本地草稿不存在")
+        if (!File(draft.imagePath).isFile) throw ApiFailureException(null, "本地图片已不存在")
+        draftDao.updateStatus(draftId, "waiting", null)
+        enqueueMistakeDraft(draftId, ExistingWorkPolicy.REPLACE)
+    }
+
+    override suspend fun deleteMistakeDraft(draftId: String) {
+        WorkManager.getInstance(context).cancelUniqueWork("mistake-upload-$draftId")
+        draftDao.get(draftId)?.let { File(it.imagePath).delete() }
+        draftDao.delete(draftId)
+    }
+
+    override suspend fun cancelMistakeOcr(mistakeId: String, taskId: String) = apiCall {
+        api.cancelMistakeOcr(mistakeId, taskId)
+        Unit
+    }
+
+    override suspend fun retryMistakeOcr(mistakeId: String, taskId: String) = apiCall {
+        api.retryMistakeOcr(mistakeId, taskId)
+        Unit
+    }
+
+    override suspend fun deleteMistake(mistakeId: String) = apiCall {
+        val response = api.deleteMistake(mistakeId)
+        if (!response.isSuccessful) throw responseFailure(response.code(), response.errorBody()?.charStream())
+    }
+
+    private fun enqueueMistakeDraft(id: String, policy: ExistingWorkPolicy) {
         val request = OneTimeWorkRequestBuilder<MistakeUploadWorker>()
             .addTag(MISTAKE_UPLOAD_TAG)
             .setInputData(Data.Builder().putString(MistakeUploadWorker.KEY_DRAFT_ID, id).build())
@@ -500,7 +537,7 @@ class NetworkAppRepository(
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(
             "mistake-upload-$id",
-            ExistingWorkPolicy.KEEP,
+            policy,
             request,
         )
     }

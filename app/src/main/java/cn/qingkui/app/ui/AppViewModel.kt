@@ -239,6 +239,59 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
+    fun retryMistakeDraft(draftId: String) {
+        viewModelScope.launch {
+            try {
+                repository.retryMistakeDraft(draftId)
+            } catch (error: Exception) {
+                handleApiError(error) { it }
+            }
+        }
+    }
+
+    fun deleteMistakeDraft(draftId: String) {
+        viewModelScope.launch {
+            try {
+                repository.deleteMistakeDraft(draftId)
+            } catch (error: Exception) {
+                handleApiError(error) { it }
+            }
+        }
+    }
+
+    fun cancelMistakeOcr(mistakeId: String, taskId: String) {
+        viewModelScope.launch {
+            try {
+                repository.cancelMistakeOcr(mistakeId, taskId)
+                refreshMistakes()
+            } catch (error: Exception) {
+                handleApiError(error) { it }
+            }
+        }
+    }
+
+    fun retryMistakeOcr(mistakeId: String, taskId: String) {
+        viewModelScope.launch {
+            try {
+                repository.retryMistakeOcr(mistakeId, taskId)
+                refreshMistakes()
+            } catch (error: Exception) {
+                handleApiError(error) { it }
+            }
+        }
+    }
+
+    fun deleteMistake(mistakeId: String) {
+        viewModelScope.launch {
+            try {
+                repository.deleteMistake(mistakeId)
+                _uiState.update { state -> state.copy(mistakes = state.mistakes.filterNot { it.id == mistakeId }) }
+            } catch (error: Exception) {
+                handleApiError(error) { it }
+            }
+        }
+    }
+
     fun analyzeMistake(mistakeId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(mistakeLoading = true, errorMessage = null) }

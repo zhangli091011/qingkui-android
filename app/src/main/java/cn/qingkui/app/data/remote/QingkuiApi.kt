@@ -140,6 +140,9 @@ interface QingkuiApi {
     @GET("mistakes")
     suspend fun mistakes(@Query("limit") limit: Int = 100): List<MistakeDto>
 
+    @DELETE("mistakes/{id}")
+    suspend fun deleteMistake(@Path("id") mistakeId: String): retrofit2.Response<Unit>
+
     @Multipart
     @POST("mistakes/{id}/images")
     suspend fun uploadMistakeImage(
@@ -153,6 +156,18 @@ interface QingkuiApi {
         @Path("taskId") taskId: String,
         @Body body: OcrCorrectionDto,
     ): MistakeDto
+
+    @POST("mistakes/{mistakeId}/ocr/{taskId}/cancel")
+    suspend fun cancelMistakeOcr(
+        @Path("mistakeId") mistakeId: String,
+        @Path("taskId") taskId: String,
+    ): OcrTaskDto
+
+    @POST("mistakes/{mistakeId}/ocr/{taskId}/retry")
+    suspend fun retryMistakeOcr(
+        @Path("mistakeId") mistakeId: String,
+        @Path("taskId") taskId: String,
+    ): OcrTaskDto
 
     @POST("mistakes/{id}/analyze")
     suspend fun analyzeMistake(@Path("id") mistakeId: String): MistakeAnalysisResponseDto
