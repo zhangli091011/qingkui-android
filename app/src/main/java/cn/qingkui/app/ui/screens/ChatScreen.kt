@@ -27,11 +27,13 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.Icon
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -61,6 +63,8 @@ import cn.qingkui.app.ui.model.ChatMessage
 import cn.qingkui.app.ui.model.MessageAuthor
 import cn.qingkui.app.ui.model.QaHelpLevel
 import cn.qingkui.app.ui.model.QaMode
+import cn.qingkui.app.ui.model.QaClarification
+import cn.qingkui.app.ui.model.QaClarificationOption
 
 @Composable
 fun ChatScreen(
@@ -73,10 +77,14 @@ fun ChatScreen(
     subject: String,
     helpLevel: QaHelpLevel,
     qaMode: QaMode,
+    clarification: QaClarification?,
     onDraftChange: (String) -> Unit,
     onHelpLevelChange: (QaHelpLevel) -> Unit,
     onQaModeChange: (QaMode) -> Unit,
     onSend: () -> Unit,
+    onStop: () -> Unit,
+    onClarification: (QaClarificationOption) -> Unit,
+    onDismissClarification: () -> Unit,
     onAttach: () -> Unit,
     onFeedback: (Long, Boolean) -> Unit,
     onRetry: (Long) -> Unit,
@@ -114,7 +122,25 @@ fun ChatScreen(
             onHelpLevelChange = onHelpLevelChange,
             onQaModeChange = onQaModeChange,
             onSend = onSend,
+            onStop = onStop,
             onAttach = onAttach,
+        )
+    }
+    if (clarification != null) {
+        AlertDialog(
+            onDismissRequest = onDismissClarification,
+            title = { Text(clarification.prompt) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    clarification.options.forEach { option ->
+                        TextButton(onClick = { onClarification(option) }, modifier = Modifier.fillMaxWidth()) {
+                            Text(option.label, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = onDismissClarification) { Text("取消") } },
         )
     }
 }
@@ -275,12 +301,13 @@ private fun PromptComposer(
     onHelpLevelChange: (QaHelpLevel) -> Unit,
     onQaModeChange: (QaMode) -> Unit,
     onSend: () -> Unit,
+    onStop: () -> Unit,
     onAttach: () -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
     var helpMenuOpen by remember { mutableStateOf(false) }
     val hasCredits = !authenticated || credits >= helpLevel.creditCost
-    val enabled = draft.isNotBlank() && hasCredits && !sending
+    val enabled = sending || (draft.isNotBlank() && hasCredits)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -373,10 +400,10 @@ private fun PromptComposer(
                     },
                 )
                 QkIconButton(
-                    imageVector = Icons.AutoMirrored.Rounded.Send,
-                    contentDescription = "发送",
+                    imageVector = if (sending) Icons.Rounded.Stop else Icons.AutoMirrored.Rounded.Send,
+                    contentDescription = if (sending) "停止生成" else "发送",
                     onClick = {
-                        onSend()
+                        if (sending) onStop() else onSend()
                         focusManager.clearFocus()
                     },
                     containerColor = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,

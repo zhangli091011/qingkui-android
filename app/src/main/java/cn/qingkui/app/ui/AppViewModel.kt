@@ -14,6 +14,7 @@ import cn.qingkui.app.ui.model.ChatMessage
 import cn.qingkui.app.ui.model.MessageAuthor
 import cn.qingkui.app.ui.model.QaHelpLevel
 import cn.qingkui.app.ui.model.QaMode
+import cn.qingkui.app.ui.model.QaClarificationOption
 import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.LearningFilter
 import kotlinx.coroutines.async
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 class AppViewModel(
@@ -36,6 +38,7 @@ class AppViewModel(
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
     private var mistakePollingJob: Job? = null
+    private var qaJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -430,26 +433,69 @@ class AppViewModel(
             _uiState.update { it.copy(errorMessage = "额度不足，当前回答需要 ${state.helpLevel.creditCost} 额度") }
             return
         }
-        val messageId = System.currentTimeMillis()
-        val assistantMessageId = messageId + 1
-        _uiState.update {
-            it.copy(
-                draft = "",
-                sending = true,
-                errorMessage = null,
-                messages = it.messages + listOf(
-                    ChatMessage(messageId, MessageAuthor.Student, question),
-                    ChatMessage(assistantMessageId, MessageAuthor.Assistant, ""),
-                ),
+        launchQuestion(question, question, state.qaMode, checkIntent = true)
+    }
+
+    fun selectQaClarification(option: QaClarificationOption) {
+        val clarification = _uiState.value.qaClarification ?: return
+        val refined = "${clarification.originalQuestion}\n\n回答目标：${option.instruction}。"
+        launchQuestion(refined, clarification.originalQuestion, option.mode, checkIntent = false)
+    }
+
+    fun dismissQaClarification() = _uiState.update { it.copy(qaClarification = null) }
+
+    fun stopGenerating() {
+        qaJob?.cancel()
+        qaJob = null
+        _uiState.update { state ->
+            val lastAssistant = state.messages.indexOfLast { it.author == MessageAuthor.Assistant }
+            state.copy(
+                sending = false,
+                messages = state.messages.mapIndexed { index, message ->
+                    if (index == lastAssistant) {
+                        message.copy(text = if (message.text.isBlank()) "已停止生成" else "${message.text}\n\n已停止生成")
+                    } else message
+                },
             )
         }
-        viewModelScope.launch {
+    }
+
+    private fun launchQuestion(
+        question: String,
+        displayQuestion: String,
+        mode: QaMode,
+        checkIntent: Boolean,
+    ) {
+        val state = _uiState.value
+        _uiState.update { it.copy(sending = true, qaClarification = null, errorMessage = null) }
+        qaJob = viewModelScope.launch {
+            var messageId: Long? = null
+            var assistantMessageId: Long? = null
             try {
+                if (checkIntent) {
+                    val clarification = repository.clarifyQaIntent(question, mode)
+                    if (clarification != null) {
+                        _uiState.update { it.copy(sending = false, qaClarification = clarification) }
+                        return@launch
+                    }
+                }
+                messageId = System.currentTimeMillis()
+                assistantMessageId = messageId + 1
+                _uiState.update {
+                    it.copy(
+                        draft = "",
+                        qaMode = mode,
+                        messages = it.messages + listOf(
+                            ChatMessage(messageId, MessageAuthor.Student, displayQuestion),
+                            ChatMessage(assistantMessageId, MessageAuthor.Assistant, ""),
+                        ),
+                    )
+                }
                 val result = repository.sendQuestion(
                     state.conversationId,
                     state.selectedNodeId,
                     question,
-                    state.qaMode,
+                    mode,
                     state.helpLevel,
                 ) { chunk ->
                     _uiState.update { current ->
@@ -471,16 +517,20 @@ class AppViewModel(
                         sending = false,
                     )
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 handleApiError(error) {
                     it.copy(
                         sending = false,
-                        draft = question,
+                        draft = displayQuestion,
                         messages = it.messages.filterNot { message ->
                             message.id == messageId || message.id == assistantMessageId
                         },
                     )
                 }
+            } finally {
+                qaJob = null
             }
         }
     }

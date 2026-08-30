@@ -154,6 +154,22 @@ data class QaResultDto(
     val subject: String? = null,
 )
 
+data class QaIntentRequest(val content: String, val mode: String)
+
+data class QaIntentOptionDto(
+    val id: String,
+    val label: String,
+    val instruction: String,
+    val mode: String,
+)
+
+data class QaIntentResultDto(
+    @SerializedName("needs_clarification") val needsClarification: Boolean,
+    val subject: String? = null,
+    val prompt: String? = null,
+    val options: List<QaIntentOptionDto> = emptyList(),
+)
+
 data class FeedbackCreate(
     val category: String,
     val content: String,

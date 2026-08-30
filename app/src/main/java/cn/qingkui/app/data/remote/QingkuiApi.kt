@@ -106,6 +106,9 @@ interface QingkuiApi {
     @POST("qa/sessions")
     suspend fun createSession(@Body body: ConversationCreate): ConversationDto
 
+    @POST("qa/intent")
+    suspend fun clarifyQaIntent(@Body body: cn.qingkui.app.data.remote.dto.QaIntentRequest): cn.qingkui.app.data.remote.dto.QaIntentResultDto
+
     @GET("qa/sessions")
     suspend fun sessions(
         @Query("q") query: String? = null,

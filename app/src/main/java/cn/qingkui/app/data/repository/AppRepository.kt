@@ -31,6 +31,7 @@ import cn.qingkui.app.data.remote.dto.NeighborNodeDto
 import cn.qingkui.app.data.remote.dto.OcrCorrectionDto
 import cn.qingkui.app.data.remote.dto.PracticeSubmitDto
 import cn.qingkui.app.data.remote.dto.RegisterRequest
+import cn.qingkui.app.data.remote.dto.QaIntentRequest
 import cn.qingkui.app.data.work.MistakeUploadWorker
 import cn.qingkui.app.ui.model.ChatMessage
 import cn.qingkui.app.ui.model.ConversationSummary
@@ -54,11 +55,15 @@ import cn.qingkui.app.ui.model.MistakePracticeItem
 import cn.qingkui.app.ui.model.MistakeWeeklyReview
 import cn.qingkui.app.ui.model.QaHelpLevel
 import cn.qingkui.app.ui.model.QaMode
+import cn.qingkui.app.ui.model.QaClarification
+import cn.qingkui.app.ui.model.QaClarificationOption
 import cn.qingkui.app.ui.model.RelationType
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -107,6 +112,7 @@ interface AppRepository {
     suspend fun sessions(query: String? = null): List<ConversationSummary>
     suspend fun restoreSession(sessionId: String): List<ChatMessage>
     suspend fun deleteSession(sessionId: String)
+    suspend fun clarifyQaIntent(question: String, mode: QaMode): QaClarification?
     suspend fun learningItems(filter: LearningFilter = LearningFilter.Recent): List<LearningItem>
     suspend fun updateNodeState(nodeId: String, status: KnowledgeStatus, note: String?, favorite: Boolean?): LearningItem?
     suspend fun startUnderstandingCheck(nodeId: String): UnderstandingCheck
@@ -383,14 +389,33 @@ class NetworkAppRepository(
         result.toQaAnswer()
     }
 
-    private fun parseStream(body: okhttp3.ResponseBody?, onDelta: (String) -> Unit): cn.qingkui.app.data.remote.dto.QaResultDto {
+    override suspend fun clarifyQaIntent(question: String, mode: QaMode): QaClarification? = apiCall {
+        val result = api.clarifyQaIntent(QaIntentRequest(question, mode.apiValue))
+        if (!result.needsClarification) return@apiCall null
+        QaClarification(
+            originalQuestion = question,
+            prompt = result.prompt ?: "你希望我怎样帮助你？",
+            options = result.options.map { option ->
+                QaClarificationOption(
+                    id = option.id,
+                    label = option.label,
+                    instruction = option.instruction,
+                    mode = QaMode.entries.firstOrNull { it.apiValue == option.mode } ?: mode,
+                )
+            },
+        )
+    }
+
+    private suspend fun parseStream(body: okhttp3.ResponseBody?, onDelta: (String) -> Unit): cn.qingkui.app.data.remote.dto.QaResultDto {
         if (body == null) throw ApiFailureException(null, "流式响应为空")
         var event = ""
         var completed: cn.qingkui.app.data.remote.dto.QaResultDto? = null
         body.use { responseBody ->
             val source = responseBody.source()
             while (!source.exhausted()) {
+                currentCoroutineContext().ensureActive()
                 val line = source.readUtf8Line() ?: break
+                currentCoroutineContext().ensureActive()
                 when {
                     line.startsWith("event: ") -> event = line.removePrefix("event: ")
                     line.startsWith("data: ") -> {

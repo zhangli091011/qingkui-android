@@ -230,6 +230,21 @@ data class MistakeWeeklyReview(
 )
 
 @Immutable
+data class QaClarificationOption(
+    val id: String,
+    val label: String,
+    val instruction: String,
+    val mode: QaMode,
+)
+
+@Immutable
+data class QaClarification(
+    val originalQuestion: String,
+    val prompt: String,
+    val options: List<QaClarificationOption>,
+)
+
+@Immutable
 data class AppUiState(
     val destination: AppDestination = AppDestination.Chat,
     val draft: String = "",
@@ -248,6 +263,7 @@ data class AppUiState(
     val authLoading: Boolean = false,
     val contentLoading: Boolean = false,
     val sending: Boolean = false,
+    val qaClarification: QaClarification? = null,
     val helpLevel: QaHelpLevel = QaHelpLevel.Approach,
     val qaMode: QaMode = QaMode.Knowledge,
     val pendingSendAfterAuth: Boolean = false,

@@ -18,6 +18,8 @@ import cn.qingkui.app.ui.model.MistakeDraftItem
 import cn.qingkui.app.ui.model.MistakeItem
 import cn.qingkui.app.ui.model.QaHelpLevel
 import cn.qingkui.app.ui.model.QaMode
+import cn.qingkui.app.ui.model.QaClarification
+import cn.qingkui.app.ui.model.QaClarificationOption
 import cn.qingkui.app.ui.model.UnderstandingCheck
 import cn.qingkui.app.ui.model.UnderstandingCheckChoice
 import kotlinx.coroutines.Dispatchers
@@ -131,6 +133,27 @@ class AppViewModelTest {
 
             assertTrue(viewModel.uiState.value.messages.isEmpty())
             assertEquals(0, repository.questionsSent)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun vagueQuestionRequiresClarificationBeforeSending() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository(clarifyVague = true)
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+            viewModel.updateDraft("这个怎么做")
+            viewModel.sendMessage()
+            advanceUntilIdle()
+            assertEquals(0, repository.questionsSent)
+            val option = viewModel.uiState.value.qaClarification!!.options.first()
+            viewModel.selectQaClarification(option)
+            advanceUntilIdle()
+            assertEquals(1, repository.questionsSent)
+            assertEquals("这个怎么做", viewModel.uiState.value.messages.first().text)
         } finally {
             Dispatchers.resetMain()
         }
@@ -338,6 +361,7 @@ private fun mistakeWithStatus(status: String) = MistakeItem(
 private class FakeRepository(
     private val answerBalance: Int = 1280,
     private val authenticated: Boolean = true,
+    private val clarifyVague: Boolean = false,
 ) : AppRepository {
     var questionsSent = 0
     val revokedSessions = mutableListOf<String>()
@@ -386,6 +410,14 @@ private class FakeRepository(
     }
     override suspend fun restoreSession(sessionId: String) = emptyList<ChatMessage>()
     override suspend fun deleteSession(sessionId: String) = Unit
+    override suspend fun clarifyQaIntent(question: String, mode: QaMode): QaClarification? =
+        if (clarifyVague && question == "这个怎么做") {
+            QaClarification(
+                question,
+                "你希望我怎样帮助你？",
+                listOf(QaClarificationOption("solve", "分析题目", "分析题目条件并给出解题思路", QaMode.Problem)),
+            )
+        } else null
     override suspend fun learningItems(filter: LearningFilter): List<LearningItem> {
         lastLearningFilter = filter
         return if (filter == LearningFilter.Verified) {
