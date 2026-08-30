@@ -51,6 +51,7 @@ import cn.qingkui.app.ui.model.MessageCitation
 import cn.qingkui.app.ui.model.MistakeDraftItem
 import cn.qingkui.app.ui.model.MistakeItem
 import cn.qingkui.app.ui.model.MistakePracticeItem
+import cn.qingkui.app.ui.model.MistakeWeeklyReview
 import cn.qingkui.app.ui.model.QaHelpLevel
 import cn.qingkui.app.ui.model.QaMode
 import cn.qingkui.app.ui.model.RelationType
@@ -124,12 +125,14 @@ interface AppRepository {
     suspend fun submitAnswerFeedback(messageId: String?, helpful: Boolean)
     fun observeMistakeDrafts(): Flow<List<MistakeDraftItem>>
     suspend fun mistakes(): List<MistakeItem>
+    suspend fun mistakeWeeklyReview(): MistakeWeeklyReview
     suspend fun saveMistakeDraft(
         imagePath: String,
         subject: String,
         questionText: String,
         studentWork: String,
         questionGoal: String,
+        errorCategory: String,
     )
     suspend fun retryMistakeDraft(draftId: String)
     suspend fun deleteMistakeDraft(draftId: String)
@@ -458,6 +461,7 @@ class NetworkAppRepository(
                 imagePath = draft.imagePath,
                 subject = draft.subject,
                 questionText = draft.questionText,
+                errorCategory = draft.errorCategory,
                 status = draft.status,
                 errorMessage = draft.errorMessage,
             )
@@ -492,7 +496,10 @@ class NetworkAppRepository(
                 practices = mistake.practices.map { practice ->
                     MistakePracticeItem(
                         id = practice.id,
+                        roundId = practice.roundId,
+                        position = practice.position,
                         questionText = practice.questionText,
+                        hint = practice.hint,
                         answerReference = practice.answerReference,
                         status = practice.status,
                         studentAnswer = practice.studentAnswer,
@@ -501,8 +508,27 @@ class NetworkAppRepository(
                     )
                 },
                 studyStatus = mistake.studyStatus,
+                reviewStage = mistake.reviewStage,
+                nextReviewAt = mistake.nextReviewAt,
+                secondAttemptCorrect = mistake.secondAttemptCorrect,
+                reviewStreak = mistake.reviewStreak,
             )
         }
+    }
+
+    override suspend fun mistakeWeeklyReview(): MistakeWeeklyReview = apiCall {
+        val report = api.mistakeWeeklyReview()
+        MistakeWeeklyReview(
+            weekStart = report.weekStart,
+            weekEnd = report.weekEnd,
+            newMistakes = report.newMistakes,
+            dueReviewCount = report.dueReviews.size,
+            topErrorCategory = report.errorCategories.maxByOrNull { it.value }?.key,
+            practiceCompletionRate = report.practiceCompletionRate,
+            authoritativeAccuracy = report.authoritativeAccuracy,
+            secondAttemptAccuracy = report.secondAttemptAccuracy,
+            sevenDayFollowupRate = report.sevenDayFollowupRate,
+        )
     }
 
     override suspend fun saveMistakeDraft(
@@ -511,6 +537,7 @@ class NetworkAppRepository(
         questionText: String,
         studentWork: String,
         questionGoal: String,
+        errorCategory: String,
     ) {
         val id = UUID.randomUUID().toString()
         draftDao.upsert(
@@ -521,6 +548,7 @@ class NetworkAppRepository(
                 questionText = questionText,
                 studentWork = studentWork,
                 questionGoal = questionGoal,
+                errorCategory = errorCategory,
                 status = "waiting",
             ),
         )

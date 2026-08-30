@@ -55,6 +55,7 @@ import cn.qingkui.app.ui.model.LearningFilter
 import cn.qingkui.app.ui.model.MistakeDraftItem
 import cn.qingkui.app.ui.model.MistakeItem
 import cn.qingkui.app.ui.model.MistakePracticeItem
+import cn.qingkui.app.ui.model.MistakeWeeklyReview
 import coil.compose.AsyncImage
 import java.io.File
 
@@ -67,6 +68,7 @@ fun LearningScreen(
     mistakes: List<MistakeItem>,
     showMistakes: Boolean,
     mistakeLoading: Boolean,
+    weeklyReview: MistakeWeeklyReview?,
     onOpenItem: (String) -> Unit,
     onShowLearning: () -> Unit,
     onFilterChange: (LearningFilter) -> Unit,
@@ -108,6 +110,7 @@ fun LearningScreen(
                     drafts = mistakeDrafts,
                     mistakes = mistakes,
                     loading = mistakeLoading,
+                    weeklyReview = weeklyReview,
                     onCapture = onCaptureMistake,
                     onRefresh = onRefreshMistakes,
                     onRetryDraft = onRetryDraft,
@@ -218,6 +221,7 @@ private fun MistakeBookContent(
     drafts: List<MistakeDraftItem>,
     mistakes: List<MistakeItem>,
     loading: Boolean,
+    weeklyReview: MistakeWeeklyReview?,
     onCapture: () -> Unit,
     onRefresh: () -> Unit,
     onRetryDraft: (String) -> Unit,
@@ -236,6 +240,7 @@ private fun MistakeBookContent(
     var correction by remember { mutableStateOf("") }
     var answering by remember { mutableStateOf<Pair<MistakeItem, MistakePracticeItem>?>(null) }
     var practiceAnswer by remember { mutableStateOf("") }
+    var showPracticeHint by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = onCapture) {
             Icon(Icons.Outlined.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -249,6 +254,24 @@ private fun MistakeBookContent(
         }
     }
     Spacer(Modifier.height(16.dp))
+    weeklyReview?.let { report ->
+        Column(
+            Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("本周复盘", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "新增 ${report.newMistakes} 题 · 待复习 ${report.dueReviewCount} 题 · 主要错因 ${errorCategoryLabel(report.topErrorCategory)}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "练习完成 ${(report.practiceCompletionRate * 100).toInt()}% · 权威正确 ${(report.authoritativeAccuracy * 100).toInt()}% · 二次正确 ${(report.secondAttemptAccuracy * 100).toInt()}% · 7日回访 ${(report.sevenDayFollowupRate * 100).toInt()}%",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+    }
     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
     val pendingDrafts = drafts.filter { it.status != "uploaded" }
     if (pendingDrafts.isEmpty() && mistakes.isEmpty()) {
@@ -312,6 +335,20 @@ private fun MistakeBookContent(
                         if (item.analysisStatus == "completed" && item.practices.isEmpty()) {
                             TextButton(onClick = { onGeneratePractice(item.id) }, enabled = !loading) { Text("生成同类练习") }
                         }
+                        if (
+                            item.analysisStatus == "completed" && item.practices.isNotEmpty() &&
+                            item.practices.none { it.status == "pending" } && item.studyStatus != "mastered"
+                        ) {
+                            TextButton(onClick = { onGeneratePractice(item.id) }, enabled = !loading) { Text("开始下一轮") }
+                        }
+                    }
+                    Text(
+                        "复习阶段：${reviewStageLabel(item.reviewStage)} · 连续通过 ${item.reviewStreak} 轮",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    item.nextReviewAt?.let {
+                        Text("下次复习：${it.replace('T', ' ').take(16)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (!item.analysisDiagnosis.isNullOrBlank()) {
                         Spacer(Modifier.height(8.dp))
@@ -327,14 +364,22 @@ private fun MistakeBookContent(
                             Text("关联知识点：${item.knowledgeNodeId}（待确认）", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    item.practices.forEach { practice ->
+                    val currentRoundId = item.practices.lastOrNull { it.roundId != null }?.roundId
+                    val visiblePractices = item.practices.filter { currentRoundId == null || it.roundId == currentRoundId }
+                    if (visiblePractices.isNotEmpty()) {
+                        val completedCount = visiblePractices.count { it.status == "completed" }
                         Spacer(Modifier.height(10.dp))
-                        Text("同类练习", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Text("本轮进度 $completedCount/${visiblePractices.size}", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    }
+                    visiblePractices.forEach { practice ->
+                        Spacer(Modifier.height(10.dp))
+                        Text("第 ${practice.position ?: 1} 题", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                         Text(practice.questionText, style = MaterialTheme.typography.bodyMedium)
                         if (practice.status == "pending") {
                             TextButton(onClick = {
                                 answering = item to practice
                                 practiceAnswer = ""
+                                showPracticeHint = false
                             }) { Text("开始作答") }
                         } else {
                             Text(
@@ -409,6 +454,14 @@ private fun MistakeBookContent(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(practice.questionText, style = MaterialTheme.typography.bodyMedium)
+                    if (!practice.hint.isNullOrBlank()) {
+                        TextButton(onClick = { showPracticeHint = !showPracticeHint }) {
+                            Text(if (showPracticeHint) "收起提示" else "查看提示")
+                        }
+                        if (showPracticeHint) {
+                            Text(practice.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                     OutlinedTextField(
                         value = practiceAnswer,
                         onValueChange = { practiceAnswer = it },
@@ -430,6 +483,24 @@ private fun MistakeBookContent(
             dismissButton = { TextButton(onClick = { answering = null }) { Text("取消") } },
         )
     }
+}
+
+private fun reviewStageLabel(stage: String): String = when (stage) {
+    "correction" -> "订正"
+    "next_day" -> "隔天复习"
+    "next_week" -> "隔周复习"
+    "completed" -> "已掌握"
+    else -> stage
+}
+
+private fun errorCategoryLabel(category: String?): String = when (category) {
+    "concept" -> "概念"
+    "reading" -> "审题"
+    "method" -> "方法"
+    "calculation" -> "计算"
+    "expression" -> "表达"
+    "unclassified", null -> "待归类"
+    else -> category
 }
 
 private fun practiceResultLabel(practice: MistakePracticeItem): String = when (practice.isCorrect) {

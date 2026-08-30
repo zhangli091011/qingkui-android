@@ -224,6 +224,7 @@ data class MistakeCreateDto(
     @SerializedName("question_text") val questionText: String?,
     @SerializedName("student_work") val studentWork: String?,
     @SerializedName("question_goal") val questionGoal: String?,
+    @SerializedName("error_category") val errorCategory: String? = null,
 )
 
 data class OcrCorrectionDto(@SerializedName("corrected_text") val correctedText: String)
@@ -265,12 +266,26 @@ data class MistakeAnalysisResponseDto(
 
 data class MistakePracticeDto(
     val id: String,
+    @SerializedName("round_id") val roundId: String? = null,
+    val position: Int? = null,
     @SerializedName("question_text") val questionText: String,
+    val hint: String? = null,
     @SerializedName("answer_reference") val answerReference: String? = null,
     val status: String,
     @SerializedName("student_answer") val studentAnswer: String? = null,
     @SerializedName("is_correct") val isCorrect: Boolean? = null,
     @SerializedName("validation_details") val validationDetails: Map<String, Any?> = emptyMap(),
+)
+
+data class MistakePracticeRoundDto(
+    val id: String,
+    @SerializedName("round_number") val roundNumber: Int,
+    @SerializedName("review_stage") val reviewStage: String,
+    val status: String,
+    @SerializedName("question_count") val questionCount: Int,
+    @SerializedName("correct_count") val correctCount: Int,
+    @SerializedName("authoritative_correct_count") val authoritativeCorrectCount: Int,
+    val practices: List<MistakePracticeDto> = emptyList(),
 )
 
 data class PracticeSubmitDto(@SerializedName("student_answer") val studentAnswer: String)
@@ -288,8 +303,31 @@ data class MistakeDto(
     @SerializedName("knowledge_node_id") val knowledgeNodeId: String? = null,
     @SerializedName("review_status") val reviewStatus: String,
     @SerializedName("study_status") val studyStatus: String,
+    @SerializedName("review_stage") val reviewStage: String = "correction",
+    @SerializedName("next_review_at") val nextReviewAt: String? = null,
+    @SerializedName("second_attempt_correct") val secondAttemptCorrect: Boolean? = null,
+    @SerializedName("review_streak") val reviewStreak: Int = 0,
     @SerializedName("created_at") val createdAt: String,
     val assets: List<MistakeAssetDto> = emptyList(),
     @SerializedName("ocr_tasks") val ocrTasks: List<OcrTaskDto> = emptyList(),
     val practices: List<MistakePracticeDto> = emptyList(),
+)
+
+data class WeeklyMistakeLinkDto(
+    @SerializedName("mistake_id") val mistakeId: String,
+    @SerializedName("practice_round_id") val practiceRoundId: String? = null,
+    val title: String,
+    @SerializedName("review_stage") val reviewStage: String,
+)
+
+data class MistakeWeeklyReviewDto(
+    @SerializedName("week_start") val weekStart: String,
+    @SerializedName("week_end") val weekEnd: String,
+    @SerializedName("new_mistakes") val newMistakes: Int,
+    @SerializedName("error_categories") val errorCategories: Map<String, Int> = emptyMap(),
+    @SerializedName("due_reviews") val dueReviews: List<WeeklyMistakeLinkDto> = emptyList(),
+    @SerializedName("practice_completion_rate") val practiceCompletionRate: Double,
+    @SerializedName("authoritative_accuracy") val authoritativeAccuracy: Double,
+    @SerializedName("second_attempt_accuracy") val secondAttemptAccuracy: Double,
+    @SerializedName("seven_day_followup_rate") val sevenDayFollowupRate: Double,
 )

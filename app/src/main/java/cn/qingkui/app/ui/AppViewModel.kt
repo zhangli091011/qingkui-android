@@ -217,10 +217,11 @@ class AppViewModel(
         questionText: String,
         studentWork: String,
         questionGoal: String,
+        errorCategory: String,
     ) {
         viewModelScope.launch {
             try {
-                repository.saveMistakeDraft(imagePath, subject, questionText, studentWork, questionGoal)
+                repository.saveMistakeDraft(imagePath, subject, questionText, studentWork, questionGoal, errorCategory)
                 _uiState.update {
                     it.copy(
                         mistakeCaptureOpen = false,
@@ -244,8 +245,14 @@ class AppViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(mistakeLoading = true) }
             try {
-                val items = repository.mistakes()
-                _uiState.update { it.copy(mistakes = items, mistakeLoading = false) }
+                val (items, weeklyReview) = coroutineScope {
+                    val itemsRequest = async { repository.mistakes() }
+                    val reviewRequest = async { repository.mistakeWeeklyReview() }
+                    itemsRequest.await() to reviewRequest.await()
+                }
+                _uiState.update {
+                    it.copy(mistakes = items, mistakeWeeklyReview = weeklyReview, mistakeLoading = false)
+                }
                 reconcileMistakePolling(items)
             } catch (error: Exception) {
                 handleApiError(error) { it.copy(mistakeLoading = false) }

@@ -158,7 +158,7 @@ class AppViewModelTest {
             val viewModel = AppViewModel(repository)
             advanceUntilIdle()
 
-            viewModel.saveMistakeDraft("", "数学", "求函数的定义域", "", "分析错因")
+            viewModel.saveMistakeDraft("", "数学", "求函数的定义域", "", "分析错因", "method")
             advanceUntilIdle()
 
             assertEquals(listOf(""), repository.savedDraftImagePaths)
@@ -329,6 +329,10 @@ private fun mistakeWithStatus(status: String) = MistakeItem(
     knowledgeNodeId = null,
     practices = emptyList(),
     studyStatus = "new",
+    reviewStage = "correction",
+    nextReviewAt = null,
+    secondAttemptCorrect = null,
+    reviewStreak = 0,
 )
 
 private class FakeRepository(
@@ -430,12 +434,24 @@ private class FakeRepository(
         mistakeCalls += 1
         return if (mistakeResponses.isEmpty()) emptyList() else mistakeResponses.removeAt(0)
     }
+    override suspend fun mistakeWeeklyReview() = cn.qingkui.app.ui.model.MistakeWeeklyReview(
+        weekStart = "2026-08-24",
+        weekEnd = "2026-08-31",
+        newMistakes = 0,
+        dueReviewCount = 0,
+        topErrorCategory = null,
+        practiceCompletionRate = 0.0,
+        authoritativeAccuracy = 0.0,
+        secondAttemptAccuracy = 0.0,
+        sevenDayFollowupRate = 0.0,
+    )
     override suspend fun saveMistakeDraft(
         imagePath: String,
         subject: String,
         questionText: String,
         studentWork: String,
         questionGoal: String,
+        errorCategory: String,
     ) {
         savedDraftImagePaths += imagePath
     }

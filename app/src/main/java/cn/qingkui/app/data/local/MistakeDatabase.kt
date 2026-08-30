@@ -10,6 +10,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "mistake_drafts")
@@ -22,6 +24,7 @@ data class MistakeDraftEntity(
     val questionText: String,
     val studentWork: String,
     val questionGoal: String,
+    val errorCategory: String = "method",
     val status: String = "draft",
     val errorMessage: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
@@ -55,7 +58,7 @@ interface MistakeDraftDao {
     suspend fun deleteAll()
 }
 
-@Database(entities = [MistakeDraftEntity::class], version = 1, exportSchema = false)
+@Database(entities = [MistakeDraftEntity::class], version = 2, exportSchema = false)
 abstract class MistakeDatabase : RoomDatabase() {
     abstract fun drafts(): MistakeDraftDao
 
@@ -67,7 +70,13 @@ abstract class MistakeDatabase : RoomDatabase() {
                 context.applicationContext,
                 MistakeDatabase::class.java,
                 "qingkui-local.db",
-            ).build().also { instance = it }
+            ).addMigrations(MIGRATION_1_2).build().also { instance = it }
+        }
+
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE mistake_drafts ADD COLUMN errorCategory TEXT NOT NULL DEFAULT 'method'")
+            }
         }
     }
 }

@@ -37,6 +37,7 @@ class MistakeUploadWorker(
                     questionText = draft.questionText.ifBlank { null },
                     studentWork = draft.studentWork.ifBlank { null },
                     questionGoal = draft.questionGoal.ifBlank { "识别图片中的题目并分析错因" },
+                    errorCategory = draft.errorCategory,
                 ),
             ).id
             if (image == null) {

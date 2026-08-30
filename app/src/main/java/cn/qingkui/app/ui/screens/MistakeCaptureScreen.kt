@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CameraAlt
@@ -71,7 +72,7 @@ import kotlin.math.roundToInt
 @Composable
 fun MistakeCaptureScreen(
     onClose: () -> Unit,
-    onSave: (String, String, String, String, String) -> Unit,
+    onSave: (String, String, String, String, String, String) -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -223,13 +224,14 @@ private fun MistakeImageEditor(
     imagePath: String?,
     onRetake: () -> Unit,
     onClose: () -> Unit,
-    onSave: (String, String, String, String, String) -> Unit,
+    onSave: (String, String, String, String, String, String) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var subject by remember { mutableStateOf("数学") }
     var question by remember { mutableStateOf("") }
     var studentWork by remember { mutableStateOf("") }
     var goal by remember { mutableStateOf("分析错因并给出同类练习") }
+    var errorCategory by remember { mutableStateOf("method") }
     var rotationDegrees by remember { mutableStateOf(0) }
     var cropInsetFraction by remember { mutableStateOf(0f) }
     var processing by remember { mutableStateOf(false) }
@@ -308,6 +310,25 @@ private fun MistakeImageEditor(
             OutlinedTextField(subject, { subject = it }, label = { Text("学科") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(question, { question = it }, label = { Text("题目文字（可留空交给 OCR）") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
             OutlinedTextField(studentWork, { studentWork = it }, label = { Text("我的作答过程") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+            Text("错因类型", style = MaterialTheme.typography.labelLarge)
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf(
+                    "concept" to "概念",
+                    "reading" to "审题",
+                    "method" to "方法",
+                    "calculation" to "计算",
+                    "expression" to "表达",
+                ).forEach { (value, label) ->
+                    if (errorCategory == value) {
+                        Button(onClick = { errorCategory = value }) { Text(label) }
+                    } else {
+                        OutlinedButton(onClick = { errorCategory = value }) { Text(label) }
+                    }
+                }
+            }
             OutlinedTextField(goal, { goal = it }, label = { Text("希望重点分析") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
             Button(
                 onClick = {
@@ -322,7 +343,14 @@ private fun MistakeImageEditor(
                             }.orEmpty()
                         }.onSuccess { processedPath ->
                             if (imagePath != null && processedPath != imagePath) File(imagePath).delete()
-                            onSave(processedPath, subject.trim().ifBlank { "待识别" }, question, studentWork, goal)
+                            onSave(
+                                processedPath,
+                                subject.trim().ifBlank { "待识别" },
+                                question,
+                                studentWork,
+                                goal,
+                                errorCategory,
+                            )
                         }.onFailure {
                             processing = false
                             processingError = it.message ?: "图片处理失败"

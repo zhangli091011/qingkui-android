@@ -45,6 +45,8 @@ import cn.qingkui.app.data.remote.dto.MistakeCreateDto
 import cn.qingkui.app.data.remote.dto.MistakeDto
 import cn.qingkui.app.data.remote.dto.MistakeAnalysisResponseDto
 import cn.qingkui.app.data.remote.dto.MistakePracticeDto
+import cn.qingkui.app.data.remote.dto.MistakePracticeRoundDto
+import cn.qingkui.app.data.remote.dto.MistakeWeeklyReviewDto
 import cn.qingkui.app.data.remote.dto.OcrCorrectionDto
 import cn.qingkui.app.data.remote.dto.OcrTaskDto
 import cn.qingkui.app.data.remote.dto.PracticeSubmitDto
@@ -152,6 +154,9 @@ interface QingkuiApi {
     @GET("mistakes")
     suspend fun mistakes(@Query("limit") limit: Int = 100): List<MistakeDto>
 
+    @GET("mistakes/review/weekly")
+    suspend fun mistakeWeeklyReview(): MistakeWeeklyReviewDto
+
     @DELETE("mistakes/{id}")
     suspend fun deleteMistake(@Path("id") mistakeId: String): retrofit2.Response<Unit>
 
@@ -185,7 +190,7 @@ interface QingkuiApi {
     suspend fun analyzeMistake(@Path("id") mistakeId: String): MistakeAnalysisResponseDto
 
     @POST("mistakes/{id}/practices/generate")
-    suspend fun generateMistakePractice(@Path("id") mistakeId: String): MistakePracticeDto
+    suspend fun generateMistakePractice(@Path("id") mistakeId: String): MistakePracticeRoundDto
 
     @POST("mistakes/{mistakeId}/practices/{practiceId}/submit")
     suspend fun submitMistakePractice(

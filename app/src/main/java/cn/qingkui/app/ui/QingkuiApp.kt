@@ -189,6 +189,7 @@ fun QingkuiApp() {
                         mistakes = uiState.mistakes,
                         showMistakes = uiState.learningShowsMistakes,
                         mistakeLoading = uiState.mistakeLoading,
+                        weeklyReview = uiState.mistakeWeeklyReview,
                         onOpenItem = { nodeId ->
                             viewModel.selectNode(nodeId)
                             viewModel.selectDestination(AppDestination.Graph)

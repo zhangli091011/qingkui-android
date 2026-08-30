@@ -173,6 +173,7 @@ data class MistakeDraftItem(
     val imagePath: String,
     val subject: String,
     val questionText: String,
+    val errorCategory: String,
     val status: String,
     val errorMessage: String?,
 )
@@ -194,17 +195,37 @@ data class MistakeItem(
     val knowledgeNodeId: String?,
     val practices: List<MistakePracticeItem>,
     val studyStatus: String,
+    val reviewStage: String,
+    val nextReviewAt: String?,
+    val secondAttemptCorrect: Boolean?,
+    val reviewStreak: Int,
 )
 
 @Immutable
 data class MistakePracticeItem(
     val id: String,
+    val roundId: String?,
+    val position: Int?,
     val questionText: String,
+    val hint: String?,
     val answerReference: String?,
     val status: String,
     val studentAnswer: String?,
     val isCorrect: Boolean?,
     val validationMethod: String?,
+)
+
+@Immutable
+data class MistakeWeeklyReview(
+    val weekStart: String,
+    val weekEnd: String,
+    val newMistakes: Int,
+    val dueReviewCount: Int,
+    val topErrorCategory: String?,
+    val practiceCompletionRate: Double,
+    val authoritativeAccuracy: Double,
+    val secondAttemptAccuracy: Double,
+    val sevenDayFollowupRate: Double,
 )
 
 @Immutable
@@ -245,6 +266,7 @@ data class AppUiState(
     val noteDraft: String = "",
     val mistakeDrafts: List<MistakeDraftItem> = emptyList(),
     val mistakes: List<MistakeItem> = emptyList(),
+    val mistakeWeeklyReview: MistakeWeeklyReview? = null,
     val mistakeCaptureOpen: Boolean = false,
     val mistakeLoading: Boolean = false,
     val learningShowsMistakes: Boolean = false,
