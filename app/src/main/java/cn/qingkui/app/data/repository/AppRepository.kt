@@ -483,6 +483,7 @@ class NetworkAppRepository(
                 questionText = mistake.correctedText ?: task?.resultText ?: mistake.questionText ?: "图片题目识别中",
                 ocrTaskId = task?.id,
                 ocrStatus = task?.status ?: "manual",
+                ocrErrorMessage = task?.errorMessage,
                 confidence = task?.confidence,
                 requiresReview = task?.requiresReview == true,
                 errorCategory = mistake.errorCategory,

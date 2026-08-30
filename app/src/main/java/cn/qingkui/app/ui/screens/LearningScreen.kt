@@ -309,7 +309,11 @@ private fun MistakeBookContent(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(item.subject, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(ocrStatusLabel(item.ocrStatus), style = MaterialTheme.typography.bodySmall, color = if (item.ocrStatus == "failed") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                ocrStatusLabel(item.ocrStatus),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (item.ocrStatus in setOf("failed", "blocked")) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                             IconButton(onClick = { mistakeToDelete = item }) {
                                 Icon(Icons.Outlined.DeleteOutline, contentDescription = "删除错题")
                             }
@@ -317,6 +321,13 @@ private fun MistakeBookContent(
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(item.questionText, style = MaterialTheme.typography.bodyLarge, maxLines = 5)
+                    if (item.ocrStatus == "blocked") {
+                        Text(
+                            item.ocrErrorMessage ?: "识别内容已被安全隔离，可删除图片或联系管理员复核。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (item.confidence != null) Text("置信度 ${(item.confidence * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -522,5 +533,6 @@ private fun ocrStatusLabel(status: String): String = when (status) {
     "succeeded" -> "识别完成"
     "failed" -> "识别失败"
     "cancelled" -> "已取消"
+    "blocked" -> "内容已隔离"
     else -> "手动录入"
 }

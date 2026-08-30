@@ -185,6 +185,7 @@ data class MistakeItem(
     val questionText: String,
     val ocrTaskId: String?,
     val ocrStatus: String,
+    val ocrErrorMessage: String? = null,
     val confidence: Double?,
     val requiresReview: Boolean,
     val errorCategory: String?,
