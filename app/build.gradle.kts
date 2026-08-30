@@ -30,9 +30,24 @@ val releaseApiBaseUrl = when (qingkuiEnvironment) {
     "pilot", "production" -> qingkuiApiBaseUrl
     else -> productionApiBaseUrl
 }
+val qingkuiVersionCodeProperty = providers.gradleProperty("QINGKUI_VERSION_CODE").orNull
+val qingkuiVersionNameProperty = providers.gradleProperty("QINGKUI_VERSION_NAME").orNull
+val qingkuiVersionCode = qingkuiVersionCodeProperty?.toIntOrNull() ?: 1
+val qingkuiVersionName = qingkuiVersionNameProperty ?: "0.1.0"
+val signingStorePath = providers.environmentVariable("QINGKUI_SIGNING_STORE_FILE").orNull
+val signingStorePassword = providers.environmentVariable("QINGKUI_SIGNING_STORE_PASSWORD").orNull
+val signingKeyAlias = providers.environmentVariable("QINGKUI_SIGNING_KEY_ALIAS").orNull
+val signingKeyPassword = providers.environmentVariable("QINGKUI_SIGNING_KEY_PASSWORD").orNull
+val releaseSigningConfigured = listOf(
+    signingStorePath,
+    signingStorePassword,
+    signingKeyAlias,
+    signingKeyPassword,
+).all { !it.isNullOrBlank() }
 require(releaseApiBaseUrl.startsWith("https://")) {
     "Release API base URL must use HTTPS: $releaseApiBaseUrl"
 }
+require(qingkuiVersionCode > 0) { "QINGKUI_VERSION_CODE must be a positive integer" }
 
 android {
     namespace = "cn.qingkui.app"
@@ -42,17 +57,31 @@ android {
         applicationId = "cn.qingkui.app"
         minSdk = 27
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = qingkuiVersionCode
+        versionName = qingkuiVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         buildConfigField("String", "API_BASE_URL", "\"$qingkuiApiBaseUrl\"")
     }
 
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            create("release") {
+                storeFile = rootProject.file(signingStorePath!!)
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -75,6 +104,33 @@ android {
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
+}
+
+val verifyReleaseSigning by tasks.registering {
+    group = "verification"
+    description = "Reject production release builds without explicit version and signing inputs."
+    doLast {
+        require(qingkuiEnvironment in setOf("pilot", "production")) {
+            "Release builds require -PQINGKUI_ENV=pilot or production"
+        }
+        require(!qingkuiVersionCodeProperty.isNullOrBlank()) {
+            "Release builds require -PQINGKUI_VERSION_CODE=<increasing integer>"
+        }
+        require(!qingkuiVersionNameProperty.isNullOrBlank()) {
+            "Release builds require -PQINGKUI_VERSION_NAME=<version>"
+        }
+        require(releaseSigningConfigured) {
+            "Release signing requires QINGKUI_SIGNING_STORE_FILE, QINGKUI_SIGNING_STORE_PASSWORD, " +
+                "QINGKUI_SIGNING_KEY_ALIAS and QINGKUI_SIGNING_KEY_PASSWORD"
+        }
+        require(rootProject.file(signingStorePath!!).isFile) {
+            "Signing keystore does not exist: $signingStorePath"
+        }
+    }
+}
+
+tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
+    dependsOn(verifyReleaseSigning)
 }
 
 dependencies {
