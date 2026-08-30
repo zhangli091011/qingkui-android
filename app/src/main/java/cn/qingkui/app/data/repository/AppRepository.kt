@@ -11,6 +11,7 @@ import androidx.work.WorkManager
 import cn.qingkui.app.data.auth.TokenStore
 import cn.qingkui.app.data.local.MistakeDatabase
 import cn.qingkui.app.data.local.MistakeDraftEntity
+import cn.qingkui.app.data.local.mistakeDraftValidationError
 import cn.qingkui.app.data.remote.NetworkModule
 import cn.qingkui.app.data.remote.QingkuiApi
 import cn.qingkui.app.data.remote.dto.ApiErrorDto
@@ -502,14 +503,16 @@ class NetworkAppRepository(
 
     override suspend fun retryMistakeDraft(draftId: String) {
         val draft = draftDao.get(draftId) ?: throw ApiFailureException(404, "本地草稿不存在")
-        if (!File(draft.imagePath).isFile) throw ApiFailureException(null, "本地图片已不存在")
+        mistakeDraftValidationError(draft.imagePath, draft.questionText)?.let { message ->
+            throw ApiFailureException(null, message)
+        }
         draftDao.updateStatus(draftId, "waiting", null)
         enqueueMistakeDraft(draftId, ExistingWorkPolicy.REPLACE)
     }
 
     override suspend fun deleteMistakeDraft(draftId: String) {
         WorkManager.getInstance(context).cancelUniqueWork("mistake-upload-$draftId")
-        draftDao.get(draftId)?.let { File(it.imagePath).delete() }
+        draftDao.get(draftId)?.imagePath?.takeIf { it.isNotBlank() }?.let { File(it).delete() }
         draftDao.delete(draftId)
     }
 
@@ -567,7 +570,9 @@ class NetworkAppRepository(
 
     private suspend fun clearLocalMistakes() {
         WorkManager.getInstance(context).cancelAllWorkByTag(MISTAKE_UPLOAD_TAG)
-        draftDao.all().forEach { File(it.imagePath).delete() }
+        draftDao.all().forEach { draft ->
+            draft.imagePath.takeIf { it.isNotBlank() }?.let { File(it).delete() }
+        }
         draftDao.deleteAll()
     }
 
