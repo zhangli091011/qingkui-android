@@ -193,6 +193,30 @@ data class LearningEventCreate(
 )
 
 data class LearningEventDto(val id: String)
+
+data class LearningCheckChoiceDto(
+    val id: String,
+    val text: String,
+)
+
+data class LearningCheckDto(
+    val id: String,
+    @SerializedName("node_id") val nodeId: String,
+    val prompt: String,
+    val choices: List<LearningCheckChoiceDto> = emptyList(),
+    val status: String,
+    @SerializedName("expires_at") val expiresAt: String,
+)
+
+data class LearningCheckSubmitDto(@SerializedName("choice_id") val choiceId: String)
+
+data class LearningCheckResultDto(
+    @SerializedName("attempt_id") val attemptId: String,
+    val passed: Boolean,
+    val status: String,
+    val state: LearningSummaryItemDto,
+)
+
 data class ApiErrorDto(val detail: String?)
 
 data class MistakeCreateDto(

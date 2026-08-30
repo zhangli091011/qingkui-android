@@ -479,7 +479,7 @@ class AppViewModel(
     }
 
     fun selectNode(nodeId: String) {
-        _uiState.update { it.copy(selectedNodeId = nodeId, conversationId = null) }
+        _uiState.update { it.copy(selectedNodeId = nodeId, conversationId = null, understandingCheck = null) }
         viewModelScope.launch {
             runCatching { repository.graph(nodeId) }
                 .onSuccess { graph -> _uiState.update { it.copy(graphNodes = graph.nodes, graphRelations = graph.relations, selectedNodeId = nodeId) } }
@@ -498,6 +498,55 @@ class AppViewModel(
                 repository.updateNodeState(nodeId, status, _uiState.value.noteDraft, null)
                 _uiState.update { state -> state.copy(graphNodes = state.graphNodes.map { if (it.id == nodeId) it.copy(status = status) else it }, learningItems = state.learningItems.map { if (it.nodeId == nodeId) it.copy(status = status) else it }) }
             } catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun startUnderstandingCheck() {
+        if (!_uiState.value.authenticated) {
+            openAuth()
+            return
+        }
+        val nodeId = _uiState.value.selectedNodeId ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(contentLoading = true, errorMessage = null) }
+            try {
+                val check = repository.startUnderstandingCheck(nodeId)
+                _uiState.update { it.copy(understandingCheck = check, contentLoading = false) }
+            } catch (error: Exception) {
+                handleApiError(error) { it.copy(contentLoading = false) }
+            }
+        }
+    }
+
+    fun submitUnderstandingCheck(choiceId: String) {
+        val check = _uiState.value.understandingCheck ?: return
+        if (_uiState.value.understandingCheckSubmitting) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(understandingCheckSubmitting = true, errorMessage = null) }
+            try {
+                val outcome = repository.submitUnderstandingCheck(check.id, choiceId)
+                _uiState.update { state ->
+                    state.copy(
+                        graphNodes = state.graphNodes.map { node ->
+                            if (node.id == check.nodeId) node.copy(status = outcome.status) else node
+                        },
+                        learningItems = state.learningItems.map { item ->
+                            if (item.nodeId == check.nodeId) item.copy(status = outcome.status) else item
+                        },
+                        understandingCheck = null,
+                        understandingCheckSubmitting = false,
+                        errorMessage = if (outcome.passed) "理解检查通过，已标记为已验证" else "本次未通过，已加入待复习",
+                    )
+                }
+            } catch (error: Exception) {
+                handleApiError(error) { it.copy(understandingCheckSubmitting = false) }
+            }
+        }
+    }
+
+    fun dismissUnderstandingCheck() {
+        if (!_uiState.value.understandingCheckSubmitting) {
+            _uiState.update { it.copy(understandingCheck = null) }
         }
     }
 

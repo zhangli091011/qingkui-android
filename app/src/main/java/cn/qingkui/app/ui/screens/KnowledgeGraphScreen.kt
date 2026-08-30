@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.CenterFocusStrong
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.QuestionAnswer
@@ -42,10 +44,13 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.ZoomIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -78,6 +83,7 @@ import cn.qingkui.app.ui.model.KnowledgeRelation
 import cn.qingkui.app.ui.model.KnowledgeSource
 import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.RelationType
+import cn.qingkui.app.ui.model.UnderstandingCheck
 
 private enum class GraphDisplayMode(val label: String) {
     Graph("图谱"),
@@ -100,6 +106,11 @@ fun KnowledgeGraphScreen(
     onAskNode: (String) -> Unit,
     onMarkStatus: (KnowledgeStatus) -> Unit = {},
     onToggleFavorite: () -> Unit = {},
+    understandingCheck: UnderstandingCheck? = null,
+    understandingCheckSubmitting: Boolean = false,
+    onStartUnderstandingCheck: () -> Unit = {},
+    onSubmitUnderstandingCheck: (String) -> Unit = {},
+    onDismissUnderstandingCheck: () -> Unit = {},
     note: String = "",
     onNoteChange: (String) -> Unit = {},
     onSearch: (String) -> Unit = {},
@@ -142,8 +153,17 @@ fun KnowledgeGraphScreen(
             selectedNode?.let { node ->
                 Spacer(Modifier.height(12.dp))
                 NodeDetailPanel(
-                    node, nodes, relations, compact = true, onAsk = { onAskNode(node.id) }, onMarkStatus, onToggleFavorite, note, onNoteChange,
-                    modifier = Modifier.fillMaxWidth().height(260.dp),
+                    node = node,
+                    nodes = nodes,
+                    relations = relations,
+                    compact = true,
+                    onAsk = { onAskNode(node.id) },
+                    onMarkStatus = onMarkStatus,
+                    onToggleFavorite = onToggleFavorite,
+                    onStartUnderstandingCheck = onStartUnderstandingCheck,
+                    note = note,
+                    onNoteChange = onNoteChange,
+                    modifier = Modifier.fillMaxWidth().height(330.dp),
                 )
             }
         } else {
@@ -155,12 +175,29 @@ fun KnowledgeGraphScreen(
                 selectedNode?.let { node ->
                     Spacer(Modifier.width(20.dp))
                     NodeDetailPanel(
-                        node, nodes, relations, compact = false, onAsk = { onAskNode(node.id) }, onMarkStatus, onToggleFavorite, note, onNoteChange,
+                        node = node,
+                        nodes = nodes,
+                        relations = relations,
+                        compact = false,
+                        onAsk = { onAskNode(node.id) },
+                        onMarkStatus = onMarkStatus,
+                        onToggleFavorite = onToggleFavorite,
+                        onStartUnderstandingCheck = onStartUnderstandingCheck,
+                        note = note,
+                        onNoteChange = onNoteChange,
                         modifier = Modifier.width(340.dp).fillMaxHeight(),
                     )
                 }
             }
         }
+    }
+    understandingCheck?.let { check ->
+        UnderstandingCheckDialog(
+            check = check,
+            submitting = understandingCheckSubmitting,
+            onSubmit = onSubmitUnderstandingCheck,
+            onDismiss = onDismissUnderstandingCheck,
+        )
     }
 }
 
@@ -543,6 +580,7 @@ private fun NodeDetailPanel(
     onAsk: () -> Unit,
     onMarkStatus: (KnowledgeStatus) -> Unit,
     onToggleFavorite: () -> Unit,
+    onStartUnderstandingCheck: () -> Unit,
     note: String,
     onNoteChange: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -609,6 +647,16 @@ private fun NodeDetailPanel(
             }
         }
         Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = onStartUnderstandingCheck,
+            modifier = Modifier.fillMaxWidth().height(42.dp),
+            shape = RoundedCornerShape(8.dp),
+        ) {
+            Icon(Icons.Outlined.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(if (node.status == KnowledgeStatus.Verified) "再次理解检查" else "开始理解检查")
+        }
+        Spacer(Modifier.height(8.dp))
         BasicTextField(
             value = note,
             onValueChange = onNoteChange,
@@ -620,6 +668,56 @@ private fun NodeDetailPanel(
             },
         )
     }
+}
+
+@Composable
+private fun UnderstandingCheckDialog(
+    check: UnderstandingCheck,
+    submitting: Boolean,
+    onSubmit: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selectedChoiceId by remember(check.id) { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = { if (!submitting) onDismiss() },
+        title = { Text("理解检查") },
+        text = {
+            Column(
+                modifier = Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(check.prompt, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                check.choices.forEach { choice ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                            .clickable(enabled = !submitting) { selectedChoiceId = choice.id }
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = selectedChoiceId == choice.id,
+                            onClick = { selectedChoiceId = choice.id },
+                            enabled = !submitting,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(choice.text, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { selectedChoiceId?.let(onSubmit) },
+                enabled = selectedChoiceId != null && !submitting,
+            ) { Text(if (submitting) "提交中" else "提交") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !submitting) { Text("取消") }
+        },
+    )
 }
 
 @Composable

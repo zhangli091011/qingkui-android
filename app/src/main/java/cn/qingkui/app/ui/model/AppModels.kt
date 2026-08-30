@@ -110,6 +110,20 @@ data class LearningItem(
     val action: String,
 )
 
+@Immutable
+data class UnderstandingCheckChoice(
+    val id: String,
+    val text: String,
+)
+
+@Immutable
+data class UnderstandingCheck(
+    val id: String,
+    val nodeId: String,
+    val prompt: String,
+    val choices: List<UnderstandingCheckChoice>,
+)
+
 enum class LearningFilter(val label: String) {
     Recent("最近学习"),
     Review("待复习"),
@@ -234,4 +248,6 @@ data class AppUiState(
     val mistakeCaptureOpen: Boolean = false,
     val mistakeLoading: Boolean = false,
     val learningShowsMistakes: Boolean = false,
+    val understandingCheck: UnderstandingCheck? = null,
+    val understandingCheckSubmitting: Boolean = false,
 )

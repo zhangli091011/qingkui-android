@@ -4,6 +4,7 @@ import cn.qingkui.app.data.repository.AppRepository
 import cn.qingkui.app.data.repository.GraphData
 import cn.qingkui.app.data.repository.MistakeAnalysisOutcome
 import cn.qingkui.app.data.repository.QaAnswer
+import cn.qingkui.app.data.repository.UnderstandingCheckOutcome
 import cn.qingkui.app.ui.model.AppDestination
 import cn.qingkui.app.ui.model.ChatMessage
 import cn.qingkui.app.ui.model.CreditLedgerItem
@@ -17,6 +18,8 @@ import cn.qingkui.app.ui.model.MistakeDraftItem
 import cn.qingkui.app.ui.model.MistakeItem
 import cn.qingkui.app.ui.model.QaHelpLevel
 import cn.qingkui.app.ui.model.QaMode
+import cn.qingkui.app.ui.model.UnderstandingCheck
+import cn.qingkui.app.ui.model.UnderstandingCheckChoice
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -32,6 +35,32 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelTest {
+    @Test
+    fun serverValidatedUnderstandingCheckUpdatesNodeStatus() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository()
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+            viewModel.selectNode("quadratic_function")
+            advanceUntilIdle()
+
+            viewModel.startUnderstandingCheck()
+            advanceUntilIdle()
+            val check = viewModel.uiState.value.understandingCheck
+            assertEquals("check-1", check?.id)
+
+            viewModel.submitUnderstandingCheck("choice-correct")
+            advanceUntilIdle()
+
+            assertEquals(null, viewModel.uiState.value.understandingCheck)
+            assertTrue(viewModel.uiState.value.errorMessage?.contains("已验证") == true)
+            assertEquals(listOf("check-1" to "choice-correct"), repository.submittedChecks)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     @Test
     fun destinationAndDraftUpdateImmediately() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -319,6 +348,7 @@ private class FakeRepository(
     val savedDraftImagePaths = mutableListOf<String>()
     val mistakeResponses = mutableListOf<List<MistakeItem>>()
     var mistakeCalls = 0
+    val submittedChecks = mutableListOf<Pair<String, String>>()
 
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null
@@ -361,6 +391,16 @@ private class FakeRepository(
         }
     }
     override suspend fun updateNodeState(nodeId: String, status: cn.qingkui.app.ui.model.KnowledgeStatus, note: String?, favorite: Boolean?) = null
+    override suspend fun startUnderstandingCheck(nodeId: String) = UnderstandingCheck(
+        id = "check-1",
+        nodeId = nodeId,
+        prompt = "选择定义",
+        choices = listOf(UnderstandingCheckChoice("choice-correct", "正确定义")),
+    )
+    override suspend fun submitUnderstandingCheck(attemptId: String, choiceId: String): UnderstandingCheckOutcome {
+        submittedChecks += attemptId to choiceId
+        return UnderstandingCheckOutcome(true, KnowledgeStatus.Verified)
+    }
     override suspend fun recordLearningEvent(nodeId: String, eventType: String, data: Map<String, Any?>) = Unit
     override suspend fun changePassword(current: String, next: String) = Unit
     override suspend fun deleteAccount() = Unit

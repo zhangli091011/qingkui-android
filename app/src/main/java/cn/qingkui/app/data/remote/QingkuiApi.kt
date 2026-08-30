@@ -16,6 +16,9 @@ import cn.qingkui.app.data.remote.dto.LearningEventCreate
 import cn.qingkui.app.data.remote.dto.LearningEventRequest
 import cn.qingkui.app.data.remote.dto.LearningSummaryItemDto
 import cn.qingkui.app.data.remote.dto.LearningEventDto
+import cn.qingkui.app.data.remote.dto.LearningCheckDto
+import cn.qingkui.app.data.remote.dto.LearningCheckResultDto
+import cn.qingkui.app.data.remote.dto.LearningCheckSubmitDto
 import cn.qingkui.app.data.remote.dto.LearningSummaryDto
 import cn.qingkui.app.data.remote.dto.LoginRequest
 import cn.qingkui.app.data.remote.dto.LogoutRequest
@@ -88,6 +91,15 @@ interface QingkuiApi {
 
     @PATCH("learning/nodes/{id}/state")
     suspend fun updateNodeState(@Path("id") nodeId: String, @Body body: KnowledgeStateUpdate): LearningSummaryItemDto
+
+    @POST("learning/nodes/{id}/checks")
+    suspend fun createLearningCheck(@Path("id") nodeId: String): LearningCheckDto
+
+    @POST("learning/checks/{id}/submit")
+    suspend fun submitLearningCheck(
+        @Path("id") attemptId: String,
+        @Body body: LearningCheckSubmitDto,
+    ): LearningCheckResultDto
 
     @POST("qa/sessions")
     suspend fun createSession(@Body body: ConversationCreate): ConversationDto

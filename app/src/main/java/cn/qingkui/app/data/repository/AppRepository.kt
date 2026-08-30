@@ -21,6 +21,7 @@ import cn.qingkui.app.data.remote.dto.FeedbackCreate
 import cn.qingkui.app.data.remote.dto.KnowledgeNodeDto
 import cn.qingkui.app.data.remote.dto.LearningEventCreate
 import cn.qingkui.app.data.remote.dto.LearningEventRequest
+import cn.qingkui.app.data.remote.dto.LearningCheckSubmitDto
 import cn.qingkui.app.data.remote.dto.KnowledgeStateUpdate
 import cn.qingkui.app.data.remote.dto.KnowledgeNodeDetailDto
 import cn.qingkui.app.data.remote.dto.LoginRequest
@@ -43,6 +44,8 @@ import cn.qingkui.app.ui.model.KnowledgeSource
 import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.LearningItem
 import cn.qingkui.app.ui.model.LearningFilter
+import cn.qingkui.app.ui.model.UnderstandingCheck
+import cn.qingkui.app.ui.model.UnderstandingCheckChoice
 import cn.qingkui.app.ui.model.MessageAuthor
 import cn.qingkui.app.ui.model.MessageCitation
 import cn.qingkui.app.ui.model.MistakeDraftItem
@@ -81,6 +84,7 @@ data class QaAnswer(
 )
 
 data class MistakeAnalysisOutcome(val balance: Int)
+data class UnderstandingCheckOutcome(val passed: Boolean, val status: KnowledgeStatus)
 
 class ApiFailureException(val statusCode: Int?, message: String) : Exception(message)
 
@@ -104,6 +108,8 @@ interface AppRepository {
     suspend fun deleteSession(sessionId: String)
     suspend fun learningItems(filter: LearningFilter = LearningFilter.Recent): List<LearningItem>
     suspend fun updateNodeState(nodeId: String, status: KnowledgeStatus, note: String?, favorite: Boolean?): LearningItem?
+    suspend fun startUnderstandingCheck(nodeId: String): UnderstandingCheck
+    suspend fun submitUnderstandingCheck(attemptId: String, choiceId: String): UnderstandingCheckOutcome
     suspend fun recordLearningEvent(nodeId: String, eventType: String, data: Map<String, Any?> = emptyMap())
     suspend fun changePassword(current: String, next: String)
     suspend fun deleteAccount()
@@ -232,6 +238,26 @@ class NetworkAppRepository(
 
     override suspend fun nodeDetail(nodeId: String): KnowledgeNode = apiCall {
         api.nodeDetail(nodeId).toUiNode(.5f, .5f)
+    }
+
+    override suspend fun startUnderstandingCheck(nodeId: String): UnderstandingCheck = apiCall {
+        api.createLearningCheck(nodeId).let { check ->
+            UnderstandingCheck(
+                id = check.id,
+                nodeId = check.nodeId,
+                prompt = check.prompt,
+                choices = check.choices.map { UnderstandingCheckChoice(it.id, it.text) },
+            )
+        }
+    }
+
+    override suspend fun submitUnderstandingCheck(
+        attemptId: String,
+        choiceId: String,
+    ): UnderstandingCheckOutcome = apiCall {
+        api.submitLearningCheck(attemptId, LearningCheckSubmitDto(choiceId)).let { result ->
+            UnderstandingCheckOutcome(result.passed, result.state.status.toKnowledgeStatus())
+        }
     }
 
     override suspend fun search(query: String): GraphData = apiCall {
