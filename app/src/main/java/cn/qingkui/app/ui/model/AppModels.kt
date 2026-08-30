@@ -102,6 +102,21 @@ data class KnowledgeRelation(
 )
 
 @Immutable
+data class KnowledgeCatalogScope(
+    val subject: String,
+    val grade: String,
+    val textbookVersion: String,
+    val nodeCount: Int,
+)
+
+@Immutable
+data class KnowledgeTreeNode(val id: String, val name: String, val status: KnowledgeStatus)
+@Immutable
+data class KnowledgeTreeSection(val name: String, val nodes: List<KnowledgeTreeNode>)
+@Immutable
+data class KnowledgeTreeChapter(val name: String, val sections: List<KnowledgeTreeSection>)
+
+@Immutable
 data class LearningItem(
     val nodeId: String,
     val title: String,
@@ -273,6 +288,9 @@ data class AppUiState(
     val currentSubject: String = "数学",
     val graphNodes: List<KnowledgeNode> = emptyList(),
     val graphRelations: List<KnowledgeRelation> = emptyList(),
+    val knowledgeCatalog: List<KnowledgeCatalogScope> = emptyList(),
+    val selectedKnowledgeScope: KnowledgeCatalogScope? = null,
+    val knowledgeChapters: List<KnowledgeTreeChapter> = emptyList(),
     val learningItems: List<LearningItem> = emptyList(),
     val learningFilter: LearningFilter = LearningFilter.Recent,
     val sessions: List<ConversationSummary> = emptyList(),

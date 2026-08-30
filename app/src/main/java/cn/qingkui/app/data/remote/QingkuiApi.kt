@@ -91,6 +91,16 @@ interface QingkuiApi {
     @GET("knowledge/search")
     suspend fun search(@Query("q") query: String): List<KnowledgeNodeDto>
 
+    @GET("knowledge/catalog")
+    suspend fun knowledgeCatalog(): List<cn.qingkui.app.data.remote.dto.KnowledgeCatalogItemDto>
+
+    @GET("knowledge/tree")
+    suspend fun knowledgeTree(
+        @Query("subject") subject: String,
+        @Query("grade") grade: String,
+        @Query("textbook_version") textbookVersion: String,
+    ): cn.qingkui.app.data.remote.dto.KnowledgeTreeDto
+
     @GET("knowledge/nodes/{id}/neighbors")
     suspend fun neighbors(@Path("id") nodeId: String): NeighborResponse
 

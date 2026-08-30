@@ -16,6 +16,7 @@ import cn.qingkui.app.ui.model.QaHelpLevel
 import cn.qingkui.app.ui.model.QaMode
 import cn.qingkui.app.ui.model.QaClarificationOption
 import cn.qingkui.app.ui.model.KnowledgeStatus
+import cn.qingkui.app.ui.model.KnowledgeCatalogScope
 import cn.qingkui.app.ui.model.LearningFilter
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -127,11 +128,17 @@ class AppViewModel(
                 val mistakesTask = async { repository.mistakes() }
                 Sextuple(creditTask.await(), graphTask.await(), learningTask.await(), sessionsTask.await(), ledgerTask.await(), mistakesTask.await())
             }
+            val catalog = repository.knowledgeCatalog()
+            val scope = catalog.firstOrNull { it.subject == _uiState.value.currentSubject } ?: catalog.firstOrNull()
+            val chapters = if (scope != null) repository.knowledgeTree(scope) else emptyList()
             _uiState.update {
                 it.copy(
                     credits = credits,
                     graphNodes = graph.nodes,
                     graphRelations = graph.relations,
+                    knowledgeCatalog = catalog,
+                    selectedKnowledgeScope = scope,
+                    knowledgeChapters = chapters,
                     selectedNodeId = graph.selectedNodeId,
                     currentSubject = graph.nodes.firstOrNull()?.evidence?.substringBefore(" · ") ?: it.currentSubject,
                     learningItems = learning,
@@ -637,6 +644,18 @@ class AppViewModel(
             runCatching { repository.search(query.trim()) }
                 .onSuccess { graph -> _uiState.update { it.copy(graphNodes = graph.nodes, graphRelations = graph.relations, selectedNodeId = graph.selectedNodeId) } }
                 .onFailure { handleApiError(it as? Exception ?: Exception(it)) { state -> state } }
+        }
+    }
+
+    fun selectKnowledgeScope(scope: KnowledgeCatalogScope) {
+        _uiState.update { it.copy(selectedKnowledgeScope = scope, currentSubject = scope.subject, contentLoading = true) }
+        viewModelScope.launch {
+            try {
+                val chapters = repository.knowledgeTree(scope)
+                _uiState.update { state ->
+                    if (state.selectedKnowledgeScope == scope) state.copy(knowledgeChapters = chapters, contentLoading = false) else state
+                }
+            } catch (error: Exception) { handleApiError(error) { it.copy(contentLoading = false) } }
         }
     }
 

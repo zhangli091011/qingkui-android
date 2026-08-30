@@ -188,6 +188,10 @@ fun QingkuiApp() {
                         onNoteChange = viewModel::updateNote,
                         onSearch = viewModel::searchGraph,
                         subject = uiState.currentSubject,
+                        catalog = uiState.knowledgeCatalog,
+                        selectedScope = uiState.selectedKnowledgeScope,
+                        chapters = uiState.knowledgeChapters,
+                        onSelectScope = viewModel::selectKnowledgeScope,
                     )
                     AppDestination.Learning -> LearningScreen(
                         compact = compact,

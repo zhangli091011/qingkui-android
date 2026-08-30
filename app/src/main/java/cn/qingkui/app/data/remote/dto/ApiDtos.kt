@@ -48,8 +48,25 @@ data class KnowledgeNodeDto(
     val subject: String,
     val grade: String,
     val chapter: String,
+    val section: String = "本章知识点",
     val definition: String,
     val status: String,
+)
+
+data class KnowledgeCatalogItemDto(
+    val subject: String,
+    val grade: String,
+    @SerializedName("textbook_version") val textbookVersion: String,
+    @SerializedName("node_count") val nodeCount: Int,
+)
+data class KnowledgeTreeNodeDto(val id: String, val name: String, val status: String)
+data class KnowledgeTreeSectionDto(val name: String, val nodes: List<KnowledgeTreeNodeDto>)
+data class KnowledgeTreeChapterDto(val name: String, val sections: List<KnowledgeTreeSectionDto>)
+data class KnowledgeTreeDto(
+    val subject: String,
+    val grade: String,
+    @SerializedName("textbook_version") val textbookVersion: String,
+    val chapters: List<KnowledgeTreeChapterDto>,
 )
 
 data class NeighborNodeDto(

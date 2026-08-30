@@ -13,6 +13,10 @@ import cn.qingkui.app.ui.model.FeedbackItem
 import cn.qingkui.app.ui.model.LearningItem
 import cn.qingkui.app.ui.model.LearningFilter
 import cn.qingkui.app.ui.model.KnowledgeStatus
+import cn.qingkui.app.ui.model.KnowledgeCatalogScope
+import cn.qingkui.app.ui.model.KnowledgeTreeChapter
+import cn.qingkui.app.ui.model.KnowledgeTreeNode
+import cn.qingkui.app.ui.model.KnowledgeTreeSection
 import cn.qingkui.app.ui.model.MessageAuthor
 import cn.qingkui.app.ui.model.MistakeDraftItem
 import cn.qingkui.app.ui.model.MistakeItem
@@ -37,6 +41,27 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelTest {
+    @Test
+    fun selectingKnowledgeScopeLoadsItsChapterTree() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository()
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+            val history = KnowledgeCatalogScope("历史", "高一", "人教版", 1)
+
+            viewModel.selectKnowledgeScope(history)
+            advanceUntilIdle()
+
+            assertEquals(history, viewModel.uiState.value.selectedKnowledgeScope)
+            assertEquals("历史", viewModel.uiState.value.currentSubject)
+            assertEquals("第一章", viewModel.uiState.value.knowledgeChapters.single().name)
+            assertEquals(history, repository.requestedKnowledgeScopes.last())
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     @Test
     fun serverValidatedUnderstandingCheckUpdatesNodeStatus() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -377,6 +402,7 @@ private class FakeRepository(
     val mistakeResponses = mutableListOf<List<MistakeItem>>()
     var mistakeCalls = 0
     val submittedChecks = mutableListOf<Pair<String, String>>()
+    val requestedKnowledgeScopes = mutableListOf<KnowledgeCatalogScope>()
 
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null
@@ -402,6 +428,21 @@ private class FakeRepository(
     override suspend fun graph(centerId: String) = GraphData(emptyList(), emptyList(), null)
     override suspend fun nodeDetail(nodeId: String) = throw UnsupportedOperationException()
     override suspend fun search(query: String) = GraphData(emptyList(), emptyList(), null)
+    override suspend fun knowledgeCatalog() = listOf(
+        KnowledgeCatalogScope("数学", "高一", "人教A版", 6),
+        KnowledgeCatalogScope("历史", "高一", "人教版", 1),
+    )
+    override suspend fun knowledgeTree(scope: KnowledgeCatalogScope): List<KnowledgeTreeChapter> {
+        requestedKnowledgeScopes += scope
+        return if (scope.subject == "历史") {
+            listOf(
+                KnowledgeTreeChapter(
+                    "第一章",
+                    listOf(KnowledgeTreeSection("第一节", listOf(KnowledgeTreeNode("history-1", "中华文明起源", KnowledgeStatus.Unexplored)))),
+                ),
+            )
+        } else emptyList()
+    }
     override suspend fun sessions(query: String?): List<cn.qingkui.app.ui.model.ConversationSummary> {
         lastSessionQuery = query
         return if (query == "判别式") {

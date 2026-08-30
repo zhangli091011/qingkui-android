@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -32,10 +34,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.CenterFocusStrong
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.QuestionAnswer
@@ -45,6 +50,8 @@ import androidx.compose.material.icons.outlined.ZoomIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -78,16 +85,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cn.qingkui.app.ui.components.QkIconButton
 import cn.qingkui.app.ui.model.KnowledgeKind
+import cn.qingkui.app.ui.model.KnowledgeCatalogScope
 import cn.qingkui.app.ui.model.KnowledgeNode
 import cn.qingkui.app.ui.model.KnowledgeRelation
 import cn.qingkui.app.ui.model.KnowledgeSource
 import cn.qingkui.app.ui.model.KnowledgeStatus
+import cn.qingkui.app.ui.model.KnowledgeTreeChapter
 import cn.qingkui.app.ui.model.RelationType
 import cn.qingkui.app.ui.model.UnderstandingCheck
 
 private enum class GraphDisplayMode(val label: String) {
     Graph("图谱"),
     Cards("知识卡"),
+    Outline("章节"),
 }
 
 private enum class DetailTab(val label: String) {
@@ -115,6 +125,10 @@ fun KnowledgeGraphScreen(
     onNoteChange: (String) -> Unit = {},
     onSearch: (String) -> Unit = {},
     subject: String = "数学",
+    catalog: List<KnowledgeCatalogScope> = emptyList(),
+    selectedScope: KnowledgeCatalogScope? = null,
+    chapters: List<KnowledgeTreeChapter> = emptyList(),
+    onSelectScope: (KnowledgeCatalogScope) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var displayMode by remember { mutableStateOf(GraphDisplayMode.Graph) }
@@ -142,12 +156,16 @@ fun KnowledgeGraphScreen(
             onSearchQueryChange = { searchQuery = it },
             subject = subject,
         )
-        RelationFilterRow(selected = relationFilter, onSelect = { relationFilter = it })
+        if (displayMode == GraphDisplayMode.Outline) {
+            KnowledgeScopePicker(catalog, selectedScope, onSelectScope)
+        } else {
+            RelationFilterRow(selected = relationFilter, onSelect = { relationFilter = it })
+        }
         Spacer(Modifier.height(12.dp))
 
         if (compact) {
             GraphContent(
-                displayMode, visibleNodes, nodes, relations, relationFilter, selectedNodeId, onSelectNode,
+                displayMode, visibleNodes, nodes, relations, relationFilter, selectedNodeId, chapters, onSelectNode,
                 Modifier.fillMaxWidth().weight(1f),
             )
             selectedNode?.let { node ->
@@ -169,7 +187,7 @@ fun KnowledgeGraphScreen(
         } else {
             Row(Modifier.fillMaxSize()) {
                 GraphContent(
-                    displayMode, visibleNodes, nodes, relations, relationFilter, selectedNodeId, onSelectNode,
+                    displayMode, visibleNodes, nodes, relations, relationFilter, selectedNodeId, chapters, onSelectNode,
                     Modifier.weight(1f).fillMaxHeight(),
                 )
                 selectedNode?.let { node ->
@@ -257,12 +275,74 @@ private fun ModeSwitch(selected: GraphDisplayMode, onSelect: (GraphDisplayMode) 
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Icon(
-                    if (mode == GraphDisplayMode.Graph) Icons.Outlined.Hub else Icons.Outlined.GridView,
+                    when (mode) {
+                        GraphDisplayMode.Graph -> Icons.Outlined.Hub
+                        GraphDisplayMode.Cards -> Icons.Outlined.GridView
+                        GraphDisplayMode.Outline -> Icons.AutoMirrored.Outlined.MenuBook
+                    },
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
                     tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(mode.label, style = MaterialTheme.typography.labelLarge, color = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun KnowledgeScopePicker(
+    catalog: List<KnowledgeCatalogScope>,
+    selected: KnowledgeCatalogScope?,
+    onSelect: (KnowledgeCatalogScope) -> Unit,
+) {
+    if (catalog.isEmpty()) {
+        Text("暂无可浏览的教材目录", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    val current = selected ?: catalog.first()
+    val subjects = catalog.map { it.subject }.distinct()
+    val grades = catalog.filter { it.subject == current.subject }.map { it.grade }.distinct()
+    val versions = catalog.filter { it.subject == current.subject && it.grade == current.grade }.map { it.textbookVersion }.distinct()
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ScopeMenu("学科", current.subject, subjects) { subject ->
+            catalog.firstOrNull { it.subject == subject }?.let(onSelect)
+        }
+        ScopeMenu("年级", current.grade, grades) { grade ->
+            catalog.firstOrNull { it.subject == current.subject && it.grade == grade }?.let(onSelect)
+        }
+        ScopeMenu("教材", current.textbookVersion, versions) { version ->
+            catalog.firstOrNull {
+                it.subject == current.subject && it.grade == current.grade && it.textbookVersion == version
+            }?.let(onSelect)
+        }
+        Text(
+            "${current.nodeCount} 个知识点",
+            modifier = Modifier.align(Alignment.CenterVertically).padding(horizontal = 4.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ScopeMenu(label: String, value: String, options: List<String>, onSelect: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { expanded = true }, shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 10.dp)) {
+            Text("$label：$value", maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.width(4.dp))
+            Icon(Icons.Outlined.ExpandMore, contentDescription = "选择$label", modifier = Modifier.size(18.dp))
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = { expanded = false; onSelect(option) },
+                )
             }
         }
     }
@@ -338,12 +418,100 @@ private fun GraphContent(
     relations: List<KnowledgeRelation>,
     relationFilter: RelationType?,
     selectedNodeId: String?,
+    chapters: List<KnowledgeTreeChapter>,
     onSelectNode: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (displayMode) {
         GraphDisplayMode.Graph -> GraphCanvas(nodes, allNodes, relations, relationFilter, selectedNodeId, onSelectNode, modifier)
         GraphDisplayMode.Cards -> KnowledgeCardGrid(nodes, selectedNodeId, onSelectNode, modifier)
+        GraphDisplayMode.Outline -> KnowledgeOutline(chapters, selectedNodeId, onSelectNode, modifier)
+    }
+}
+
+@Composable
+private fun KnowledgeOutline(
+    chapters: List<KnowledgeTreeChapter>,
+    selectedNodeId: String?,
+    onSelectNode: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (chapters.isEmpty()) {
+        Box(
+            modifier = modifier
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = .78f), RoundedCornerShape(8.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("当前教材暂无已审核的章节", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+    LazyColumn(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = .78f), RoundedCornerShape(8.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+        contentPadding = PaddingValues(vertical = 8.dp),
+    ) {
+        lazyItems(chapters, key = { it.name }) { chapter ->
+            ChapterRow(chapter, selectedNodeId, onSelectNode)
+        }
+    }
+}
+
+@Composable
+private fun ChapterRow(
+    chapter: KnowledgeTreeChapter,
+    selectedNodeId: String?,
+    onSelectNode: (String) -> Unit,
+) {
+    var expanded by remember(chapter.name) { mutableStateOf(true) }
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                contentDescription = if (expanded) "收起章节" else "展开章节",
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(chapter.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text("${chapter.sections.sumOf { it.nodes.size }}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (expanded) {
+            chapter.sections.forEach { section ->
+                Text(
+                    section.name,
+                    modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background.copy(alpha = .7f)).padding(horizontal = 46.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                section.nodes.forEach { node ->
+                    val active = node.id == selectedNodeId
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(if (active) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                            .clickable { onSelectNode(node.id) }
+                            .padding(start = 46.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.size(8.dp).background(statusColor(node.status), CircleShape))
+                        Spacer(Modifier.width(10.dp))
+                        Text(node.name, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        Icon(
+                            Icons.AutoMirrored.Outlined.ArrowForward,
+                            contentDescription = "打开知识点",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .6f))
     }
 }
 

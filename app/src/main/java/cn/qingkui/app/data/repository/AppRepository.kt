@@ -44,6 +44,10 @@ import cn.qingkui.app.ui.model.KnowledgeKind
 import cn.qingkui.app.ui.model.KnowledgeNode
 import cn.qingkui.app.ui.model.KnowledgeRelation
 import cn.qingkui.app.ui.model.KnowledgeSource
+import cn.qingkui.app.ui.model.KnowledgeCatalogScope
+import cn.qingkui.app.ui.model.KnowledgeTreeChapter
+import cn.qingkui.app.ui.model.KnowledgeTreeSection
+import cn.qingkui.app.ui.model.KnowledgeTreeNode
 import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.LearningItem
 import cn.qingkui.app.ui.model.LearningFilter
@@ -113,6 +117,8 @@ interface AppRepository {
     suspend fun graph(centerId: String = "quadratic_function"): GraphData
     suspend fun nodeDetail(nodeId: String): KnowledgeNode
     suspend fun search(query: String): GraphData
+    suspend fun knowledgeCatalog(): List<KnowledgeCatalogScope>
+    suspend fun knowledgeTree(scope: KnowledgeCatalogScope): List<KnowledgeTreeChapter>
     suspend fun sessions(query: String? = null): List<ConversationSummary>
     suspend fun restoreSession(sessionId: String): List<ChatMessage>
     suspend fun deleteSession(sessionId: String)
@@ -290,6 +296,24 @@ class NetworkAppRepository(
             )
         }
         GraphData(nodes, emptyList(), nodes.firstOrNull()?.id)
+    }
+
+    override suspend fun knowledgeCatalog(): List<KnowledgeCatalogScope> = apiCall {
+        api.knowledgeCatalog().map { KnowledgeCatalogScope(it.subject, it.grade, it.textbookVersion, it.nodeCount) }
+    }
+
+    override suspend fun knowledgeTree(scope: KnowledgeCatalogScope): List<KnowledgeTreeChapter> = apiCall {
+        api.knowledgeTree(scope.subject, scope.grade, scope.textbookVersion).chapters.map { chapter ->
+            KnowledgeTreeChapter(
+                chapter.name,
+                chapter.sections.map { section ->
+                    KnowledgeTreeSection(
+                        section.name,
+                        section.nodes.map { node -> KnowledgeTreeNode(node.id, node.name, node.status.toKnowledgeStatus()) },
+                    )
+                },
+            )
+        }
     }
 
     override suspend fun sessions(query: String?): List<ConversationSummary> = apiCall {
