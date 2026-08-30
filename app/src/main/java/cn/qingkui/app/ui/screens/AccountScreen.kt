@@ -30,6 +30,7 @@ import androidx.compose.material.icons.outlined.Feedback
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PrivacyTip
+import androidx.compose.material.icons.outlined.School
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
@@ -79,6 +80,7 @@ fun AccountScreen(
     var feedbackContent by remember { mutableStateOf("") }
     var dataDialog by remember { mutableStateOf(false) }
     var privacyDialog by remember { mutableStateOf(false) }
+    var minorDialog by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -157,6 +159,7 @@ fun AccountScreen(
             SettingsRow(Icons.Outlined.Brightness6, "外观", "跟随系统深色模式")
             SettingsRow(Icons.Outlined.DataUsage, "数据说明", "学习记录、错题和删除范围", onClick = { dataDialog = true })
             SettingsRow(Icons.Outlined.PrivacyTip, "隐私说明", "账户、图片与模型调用边界", onClick = { privacyDialog = true })
+            SettingsRow(Icons.Outlined.School, "未成年人及试点", "授权、教师可见范围与退出方式", onClick = { minorDialog = true })
             SettingsRow(Icons.Outlined.Feedback, "问题反馈", "提交反馈并查看处理状态", onClick = {
                 if (authenticated) {
                     onRefreshAccount()
@@ -285,25 +288,64 @@ fun AccountScreen(
     if (dataDialog) {
         InfoDialog(
             title = "数据说明",
-            content = "学习状态、笔记、收藏、问答会话、额度流水和错题记录保存在账户中。错题原图存放于私有对象存储，仅通过登录后的接口访问。删除错题会同时删除其图片；注销账户会删除个人学习数据、会话和错题图片，并匿名化必要审计记录。",
+            sections = listOf(
+                InfoSection("账户数据", "学习状态、笔记、收藏、问答会话、额度流水和错题记录保存在账户中。"),
+                InfoSection("图片与文档", "错题原图存放于私有对象存储，应用通过登录后的服务端接口访问，设备不会持有对象存储密钥。"),
+                InfoSection("删除范围", "删除错题会同时删除对应图片；注销会删除在线账户数据、会话和错题图片，并将必须保留的审计事实匿名化。灾备副本会按运维保留周期自然过期，不用于日常检索。"),
+            ),
             onDismiss = { dataDialog = false },
         )
     }
     if (privacyDialog) {
         InfoDialog(
             title = "隐私说明",
-            content = "应用不会把对象存储密钥或模型密钥写入设备。题目、作答过程和提问内容只在完成问答、OCR 与错因分析时发送至服务端。请勿上传身份证件、联系方式或与学习无关的个人信息。你可以随时删除错题、会话或注销账户。",
+            sections = listOf(
+                InfoSection("处理目的", "题目、作答过程和提问内容只在完成问答、检索、OCR 与错因分析时发送至服务端。"),
+                InfoSection("第三方模型", "服务端只向配置的模型服务发送完成当前任务所需的内容。模型输出可能有误，重要结论应结合教材和引用来源核验。"),
+                InfoSection("安全边界", "应用不会把对象存储密钥或模型密钥写入设备。请勿上传身份证件、联系方式、精确住址或与学习无关的个人信息。"),
+                InfoSection("你的控制", "你可以删除错题和会话、退出登录或注销账户，也可以通过问题反馈报告内容错误或隐私问题。"),
+            ),
             onDismiss = { privacyDialog = false },
+        )
+    }
+    if (minorDialog) {
+        InfoDialog(
+            title = "未成年人及试点说明",
+            sections = listOf(
+                InfoSection("参加条件", "未成年人参加学校或组织试点前，应由试点负责人完成适用的学校和监护人告知、授权及退出安排。应用内登录不代替这些手续。"),
+                InfoSection("最少信息", "试点不要求填写真实姓名、身份证号、手机号或精确位置。账户名和昵称也不应包含这些信息。"),
+                InfoSection("教师可见范围", "学校与班级功能当前默认关闭。将来仅在明确授权后开启；教师端默认只提供班级聚合和匿名学生标识，不展示提问、回答、笔记、反馈正文或错题图片。"),
+                InfoSection("退出试点", "参与者可联系试点负责人停止参与，并在应用中删除个人内容或注销账户。试点管理员可按批准名单执行数据清理。"),
+            ),
+            onDismiss = { minorDialog = false },
         )
     }
 }
 
+private data class InfoSection(val title: String, val content: String)
+
 @Composable
-private fun InfoDialog(title: String, content: String, onDismiss: () -> Unit) {
+private fun InfoDialog(title: String, sections: List<InfoSection>, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
-        text = { Text(content, style = MaterialTheme.typography.bodyMedium) },
+        text = {
+            Column(
+                modifier = Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                sections.forEach { section ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(section.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            section.content,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        },
         confirmButton = { TextButton(onClick = onDismiss) { Text("知道了") } },
     )
 }
