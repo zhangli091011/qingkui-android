@@ -98,7 +98,7 @@ interface AppRepository {
     suspend fun graph(centerId: String = "quadratic_function"): GraphData
     suspend fun nodeDetail(nodeId: String): KnowledgeNode
     suspend fun search(query: String): GraphData
-    suspend fun sessions(): List<ConversationSummary>
+    suspend fun sessions(query: String? = null): List<ConversationSummary>
     suspend fun restoreSession(sessionId: String): List<ChatMessage>
     suspend fun deleteSession(sessionId: String)
     suspend fun learningItems(filter: LearningFilter = LearningFilter.Recent): List<LearningItem>
@@ -239,8 +239,8 @@ class NetworkAppRepository(
         GraphData(nodes, emptyList(), nodes.firstOrNull()?.id)
     }
 
-    override suspend fun sessions(): List<ConversationSummary> = apiCall {
-        api.sessions().map { item ->
+    override suspend fun sessions(query: String?): List<ConversationSummary> = apiCall {
+        api.sessions(query = query?.trim()?.takeIf { it.isNotEmpty() }).map { item ->
             ConversationSummary(item.id, item.title, item.mode, item.subject, item.updatedAt)
         }
     }

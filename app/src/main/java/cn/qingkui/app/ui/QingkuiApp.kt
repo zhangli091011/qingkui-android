@@ -102,6 +102,7 @@ fun QingkuiApp() {
             SessionDrawer(
                 authenticated = uiState.authenticated,
                 sessions = uiState.sessions,
+                searchQuery = uiState.sessionSearchQuery,
                 onClose = { viewModel.setDrawerOpen(false) },
                 onOpenChat = {
                     viewModel.selectDestination(AppDestination.Chat)
@@ -111,6 +112,8 @@ fun QingkuiApp() {
                 onLogin = viewModel::openAuth,
                 onRestoreSession = viewModel::restoreSession,
                 onDeleteSession = viewModel::deleteSession,
+                onSearchQueryChange = viewModel::updateSessionSearch,
+                onSearch = viewModel::searchSessions,
             )
         },
     ) {

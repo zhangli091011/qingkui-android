@@ -195,6 +195,26 @@ class AppViewModelTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun sessionSearchUsesServerQueryAndKeepsResultsRestorable() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository()
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+
+            viewModel.updateSessionSearch("  判别式  ")
+            viewModel.searchSessions()
+            advanceUntilIdle()
+
+            assertEquals("判别式", repository.lastSessionQuery)
+            assertEquals(listOf("matched-session"), viewModel.uiState.value.sessions.map { it.id })
+            assertEquals("  判别式  ", viewModel.uiState.value.sessionSearchQuery)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
 }
 
 private class FakeRepository(
@@ -206,6 +226,7 @@ private class FakeRepository(
     val feedbackSubmissions = mutableListOf<Pair<String, String>>()
     val analyzedMistakes = mutableListOf<String>()
     var lastLearningFilter = LearningFilter.Recent
+    var lastSessionQuery: String? = null
 
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null
@@ -229,7 +250,14 @@ private class FakeRepository(
     override suspend fun graph(centerId: String) = GraphData(emptyList(), emptyList(), null)
     override suspend fun nodeDetail(nodeId: String) = throw UnsupportedOperationException()
     override suspend fun search(query: String) = GraphData(emptyList(), emptyList(), null)
-    override suspend fun sessions() = emptyList<cn.qingkui.app.ui.model.ConversationSummary>()
+    override suspend fun sessions(query: String?): List<cn.qingkui.app.ui.model.ConversationSummary> {
+        lastSessionQuery = query
+        return if (query == "判别式") {
+            listOf(cn.qingkui.app.ui.model.ConversationSummary("matched-session", "判别式", "knowledge", "数学"))
+        } else {
+            emptyList()
+        }
+    }
     override suspend fun restoreSession(sessionId: String) = emptyList<ChatMessage>()
     override suspend fun deleteSession(sessionId: String) = Unit
     override suspend fun learningItems(filter: LearningFilter): List<LearningItem> {

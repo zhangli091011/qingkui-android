@@ -98,7 +98,9 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
                 val creditTask = async { repository.credits() }
                 val graphTask = async { repository.graph() }
                 val learningTask = async { repository.learningItems(_uiState.value.learningFilter) }
-                val sessionsTask = async { repository.sessions() }
+                val sessionsTask = async {
+                    repository.sessions(_uiState.value.sessionSearchQuery.trim().takeIf { it.isNotEmpty() })
+                }
                 val ledgerTask = async { repository.creditLedger() }
                 val mistakesTask = async { repository.mistakes() }
                 Sextuple(creditTask.await(), graphTask.await(), learningTask.await(), sessionsTask.await(), ledgerTask.await(), mistakesTask.await())
@@ -421,6 +423,24 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
                 repository.deleteSession(sessionId)
                 _uiState.update { state -> state.copy(sessions = state.sessions.filterNot { it.id == sessionId }, conversationId = if (state.conversationId == sessionId) null else state.conversationId, messages = if (state.conversationId == sessionId) emptyList() else state.messages) }
             } catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun updateSessionSearch(value: String) {
+        _uiState.update { it.copy(sessionSearchQuery = value.take(120), errorMessage = null) }
+    }
+
+    fun searchSessions(query: String = _uiState.value.sessionSearchQuery) {
+        if (!_uiState.value.authenticated) return
+        val normalized = query.trim().takeIf { it.isNotEmpty() }
+        _uiState.update { it.copy(sessionSearchQuery = query.take(120), contentLoading = true, errorMessage = null) }
+        viewModelScope.launch {
+            try {
+                val sessions = repository.sessions(normalized)
+                _uiState.update { it.copy(sessions = sessions, contentLoading = false) }
+            } catch (error: Exception) {
+                handleApiError(error) { it.copy(contentLoading = false) }
+            }
         }
     }
 

@@ -223,6 +223,7 @@ data class AppUiState(
     val learningItems: List<LearningItem> = emptyList(),
     val learningFilter: LearningFilter = LearningFilter.Recent,
     val sessions: List<ConversationSummary> = emptyList(),
+    val sessionSearchQuery: String = "",
     val ledger: List<CreditLedgerItem> = emptyList(),
     val deviceSessions: List<DeviceSessionItem> = emptyList(),
     val feedbackItems: List<FeedbackItem> = emptyList(),

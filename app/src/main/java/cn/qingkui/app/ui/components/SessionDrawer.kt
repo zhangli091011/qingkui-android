@@ -16,11 +16,17 @@ import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,10 +39,13 @@ import cn.qingkui.app.ui.model.ConversationSummary
 fun SessionDrawer(
     authenticated: Boolean,
     sessions: List<ConversationSummary> = emptyList(),
+    searchQuery: String = "",
     onClose: () -> Unit,
     onOpenChat: () -> Unit,
     onRestoreSession: (String) -> Unit = {},
     onDeleteSession: (String) -> Unit = {},
+    onSearchQueryChange: (String) -> Unit = {},
+    onSearch: (String) -> Unit = {},
     onLogout: () -> Unit,
     onLogin: () -> Unit,
 ) {
@@ -52,14 +61,43 @@ fun SessionDrawer(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(28.dp))
-            DrawerRow(Icons.Outlined.Search, "搜索会话", onClose)
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = authenticated,
+                singleLine = true,
+                label = { Text("搜索会话") },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotBlank()) {
+                        IconButton(onClick = {
+                            onSearchQueryChange("")
+                            onSearch("")
+                        }) {
+                            Icon(Icons.Outlined.Close, contentDescription = "清空搜索")
+                        }
+                    } else {
+                        IconButton(onClick = { onSearch(searchQuery) }) {
+                            Icon(Icons.Outlined.Search, contentDescription = "搜索")
+                        }
+                    }
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { onSearch(searchQuery) }),
+            )
+            Spacer(Modifier.height(12.dp))
             if (sessions.isEmpty()) {
-                DrawerRow(Icons.Outlined.History, "暂无历史会话", onOpenChat)
+                DrawerRow(
+                    Icons.Outlined.History,
+                    if (searchQuery.isBlank()) "暂无历史会话" else "未找到匹配会话",
+                    onOpenChat,
+                )
             } else {
-                sessions.take(8).forEach { session ->
+                sessions.take(20).forEach { session ->
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                         DrawerRow(Icons.Outlined.History, session.title, { onRestoreSession(session.id) }, Modifier.weight(1f))
-                        androidx.compose.material3.IconButton(onClick = { onDeleteSession(session.id) }) {
+                        IconButton(onClick = { onDeleteSession(session.id) }) {
                             Icon(Icons.Outlined.DeleteOutline, contentDescription = "删除会话")
                         }
                     }

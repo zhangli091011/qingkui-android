@@ -93,7 +93,10 @@ interface QingkuiApi {
     suspend fun createSession(@Body body: ConversationCreate): ConversationDto
 
     @GET("qa/sessions")
-    suspend fun sessions(@Query("limit") limit: Int = 50): List<ConversationDto>
+    suspend fun sessions(
+        @Query("q") query: String? = null,
+        @Query("limit") limit: Int = 50,
+    ): List<ConversationDto>
 
     @GET("qa/sessions/{id}")
     suspend fun session(@Path("id") sessionId: String): ConversationDto
