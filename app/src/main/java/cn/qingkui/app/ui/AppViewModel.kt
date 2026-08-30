@@ -217,6 +217,48 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
+    fun analyzeMistake(mistakeId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(mistakeLoading = true, errorMessage = null) }
+            try {
+                val outcome = repository.analyzeMistake(mistakeId)
+                val items = repository.mistakes()
+                _uiState.update {
+                    it.copy(credits = outcome.balance, mistakes = items, mistakeLoading = false)
+                }
+            } catch (error: Exception) {
+                handleApiError(error) { it.copy(mistakeLoading = false) }
+            }
+        }
+    }
+
+    fun generateMistakePractice(mistakeId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(mistakeLoading = true, errorMessage = null) }
+            try {
+                repository.generateMistakePractice(mistakeId)
+                val items = repository.mistakes()
+                _uiState.update { it.copy(mistakes = items, mistakeLoading = false) }
+            } catch (error: Exception) {
+                handleApiError(error) { it.copy(mistakeLoading = false) }
+            }
+        }
+    }
+
+    fun submitMistakePractice(mistakeId: String, practiceId: String, answer: String) {
+        if (answer.isBlank()) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(mistakeLoading = true, errorMessage = null) }
+            try {
+                repository.submitMistakePractice(mistakeId, practiceId, answer)
+                val items = repository.mistakes()
+                _uiState.update { it.copy(mistakes = items, mistakeLoading = false) }
+            } catch (error: Exception) {
+                handleApiError(error) { it.copy(mistakeLoading = false) }
+            }
+        }
+    }
+
     fun updateDraft(value: String) = _uiState.update { it.copy(draft = value, errorMessage = null) }
     fun selectHelpLevel(value: QaHelpLevel) = _uiState.update { it.copy(helpLevel = value, errorMessage = null) }
     fun selectQaMode(value: QaMode) = _uiState.update { it.copy(qaMode = value, errorMessage = null, conversationId = null, messages = emptyList()) }

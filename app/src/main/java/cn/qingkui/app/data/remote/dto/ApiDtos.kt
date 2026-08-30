@@ -219,6 +219,37 @@ data class OcrTaskDto(
     @SerializedName("error_message") val errorMessage: String? = null,
 )
 
+data class MistakeAnalysisDataDto(
+    val diagnosis: String,
+    @SerializedName("error_category") val errorCategory: String,
+    @SerializedName("error_note") val errorNote: String,
+    @SerializedName("correction_steps") val correctionSteps: List<String> = emptyList(),
+    @SerializedName("suggested_node_id") val suggestedNodeId: String? = null,
+    @SerializedName("node_confidence") val nodeConfidence: Double = 0.0,
+    @SerializedName("similar_question") val similarQuestion: String,
+    @SerializedName("answer_reference") val answerReference: String,
+    val uncertain: Boolean = false,
+)
+
+data class MistakeAnalysisResponseDto(
+    @SerializedName("mistake_id") val mistakeId: String,
+    val analysis: MistakeAnalysisDataDto,
+    @SerializedName("credits_charged") val creditsCharged: Int,
+    val balance: Int,
+)
+
+data class MistakePracticeDto(
+    val id: String,
+    @SerializedName("question_text") val questionText: String,
+    @SerializedName("answer_reference") val answerReference: String? = null,
+    val status: String,
+    @SerializedName("student_answer") val studentAnswer: String? = null,
+    @SerializedName("is_correct") val isCorrect: Boolean? = null,
+    @SerializedName("validation_details") val validationDetails: Map<String, Any?> = emptyMap(),
+)
+
+data class PracticeSubmitDto(@SerializedName("student_answer") val studentAnswer: String)
+
 data class MistakeDto(
     val id: String,
     val subject: String? = null,
@@ -226,9 +257,14 @@ data class MistakeDto(
     @SerializedName("corrected_text") val correctedText: String? = null,
     @SerializedName("student_work") val studentWork: String? = null,
     @SerializedName("error_category") val errorCategory: String? = null,
+    @SerializedName("error_note") val errorNote: String? = null,
+    val analysis: Map<String, Any?> = emptyMap(),
+    @SerializedName("analysis_status") val analysisStatus: String = "not_started",
+    @SerializedName("knowledge_node_id") val knowledgeNodeId: String? = null,
     @SerializedName("review_status") val reviewStatus: String,
     @SerializedName("study_status") val studyStatus: String,
     @SerializedName("created_at") val createdAt: String,
     val assets: List<MistakeAssetDto> = emptyList(),
     @SerializedName("ocr_tasks") val ocrTasks: List<OcrTaskDto> = emptyList(),
+    val practices: List<MistakePracticeDto> = emptyList(),
 )

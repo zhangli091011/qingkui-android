@@ -189,6 +189,9 @@ fun QingkuiApp() {
                         onCaptureMistake = viewModel::openMistakeCapture,
                         onRefreshMistakes = viewModel::refreshMistakes,
                         onConfirmOcr = viewModel::confirmMistakeOcr,
+                        onAnalyzeMistake = viewModel::analyzeMistake,
+                        onGeneratePractice = viewModel::generateMistakePractice,
+                        onSubmitPractice = viewModel::submitMistakePractice,
                     )
                     AppDestination.Account -> AccountScreen(
                         compact = compact,

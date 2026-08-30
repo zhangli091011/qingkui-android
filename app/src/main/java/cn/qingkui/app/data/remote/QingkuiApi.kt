@@ -39,8 +39,11 @@ import retrofit2.http.Multipart
 import retrofit2.http.Part
 import cn.qingkui.app.data.remote.dto.MistakeCreateDto
 import cn.qingkui.app.data.remote.dto.MistakeDto
+import cn.qingkui.app.data.remote.dto.MistakeAnalysisResponseDto
+import cn.qingkui.app.data.remote.dto.MistakePracticeDto
 import cn.qingkui.app.data.remote.dto.OcrCorrectionDto
 import cn.qingkui.app.data.remote.dto.OcrTaskDto
+import cn.qingkui.app.data.remote.dto.PracticeSubmitDto
 
 interface QingkuiApi {
     @POST("auth/register")
@@ -138,4 +141,17 @@ interface QingkuiApi {
         @Path("taskId") taskId: String,
         @Body body: OcrCorrectionDto,
     ): MistakeDto
+
+    @POST("mistakes/{id}/analyze")
+    suspend fun analyzeMistake(@Path("id") mistakeId: String): MistakeAnalysisResponseDto
+
+    @POST("mistakes/{id}/practices/generate")
+    suspend fun generateMistakePractice(@Path("id") mistakeId: String): MistakePracticeDto
+
+    @POST("mistakes/{mistakeId}/practices/{practiceId}/submit")
+    suspend fun submitMistakePractice(
+        @Path("mistakeId") mistakeId: String,
+        @Path("practiceId") practiceId: String,
+        @Body body: PracticeSubmitDto,
+    ): MistakePracticeDto
 }

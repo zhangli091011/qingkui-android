@@ -2,6 +2,7 @@ package cn.qingkui.app.ui
 
 import cn.qingkui.app.data.repository.AppRepository
 import cn.qingkui.app.data.repository.GraphData
+import cn.qingkui.app.data.repository.MistakeAnalysisOutcome
 import cn.qingkui.app.data.repository.QaAnswer
 import cn.qingkui.app.ui.model.AppDestination
 import cn.qingkui.app.ui.model.ChatMessage
@@ -154,6 +155,25 @@ class AppViewModelTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun mistakeAnalysisUsesBackendBalanceAndRefreshesList() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository(answerBalance = 41)
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+
+            viewModel.analyzeMistake("mistake-1")
+            advanceUntilIdle()
+
+            assertEquals(listOf("mistake-1"), repository.analyzedMistakes)
+            assertEquals(41, viewModel.uiState.value.credits)
+            assertEquals(false, viewModel.uiState.value.mistakeLoading)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
 }
 
 private class FakeRepository(
@@ -163,6 +183,7 @@ private class FakeRepository(
     var questionsSent = 0
     val revokedSessions = mutableListOf<String>()
     val feedbackSubmissions = mutableListOf<Pair<String, String>>()
+    val analyzedMistakes = mutableListOf<String>()
 
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null
@@ -225,4 +246,10 @@ private class FakeRepository(
         questionGoal: String,
     ) = Unit
     override suspend fun confirmMistakeOcr(mistakeId: String, taskId: String, correctedText: String) = Unit
+    override suspend fun analyzeMistake(mistakeId: String): MistakeAnalysisOutcome {
+        analyzedMistakes += mistakeId
+        return MistakeAnalysisOutcome(answerBalance)
+    }
+    override suspend fun generateMistakePractice(mistakeId: String) = Unit
+    override suspend fun submitMistakePractice(mistakeId: String, practiceId: String, answer: String) = Unit
 }

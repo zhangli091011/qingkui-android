@@ -27,6 +27,7 @@ import cn.qingkui.app.data.remote.dto.LogoutRequest
 import cn.qingkui.app.data.remote.dto.MessageCreate
 import cn.qingkui.app.data.remote.dto.NeighborNodeDto
 import cn.qingkui.app.data.remote.dto.OcrCorrectionDto
+import cn.qingkui.app.data.remote.dto.PracticeSubmitDto
 import cn.qingkui.app.data.remote.dto.RegisterRequest
 import cn.qingkui.app.data.work.MistakeUploadWorker
 import cn.qingkui.app.ui.model.ChatMessage
@@ -44,6 +45,7 @@ import cn.qingkui.app.ui.model.MessageAuthor
 import cn.qingkui.app.ui.model.MessageCitation
 import cn.qingkui.app.ui.model.MistakeDraftItem
 import cn.qingkui.app.ui.model.MistakeItem
+import cn.qingkui.app.ui.model.MistakePracticeItem
 import cn.qingkui.app.ui.model.QaHelpLevel
 import cn.qingkui.app.ui.model.QaMode
 import cn.qingkui.app.ui.model.RelationType
@@ -75,6 +77,8 @@ data class QaAnswer(
     val creditsCharged: Int,
     val subject: String? = null,
 )
+
+data class MistakeAnalysisOutcome(val balance: Int)
 
 class ApiFailureException(val statusCode: Int?, message: String) : Exception(message)
 
@@ -120,6 +124,9 @@ interface AppRepository {
         questionGoal: String,
     )
     suspend fun confirmMistakeOcr(mistakeId: String, taskId: String, correctedText: String)
+    suspend fun analyzeMistake(mistakeId: String): MistakeAnalysisOutcome
+    suspend fun generateMistakePractice(mistakeId: String)
+    suspend fun submitMistakePractice(mistakeId: String, practiceId: String, answer: String)
 }
 
 class NetworkAppRepository(
@@ -434,6 +441,24 @@ class NetworkAppRepository(
                 confidence = task?.confidence,
                 requiresReview = task?.requiresReview == true,
                 errorCategory = mistake.errorCategory,
+                errorNote = mistake.errorNote,
+                analysisStatus = mistake.analysisStatus,
+                analysisDiagnosis = mistake.analysis["diagnosis"] as? String,
+                correctionSteps = (mistake.analysis["correction_steps"] as? List<*>)
+                    ?.mapNotNull { it as? String }
+                    .orEmpty(),
+                knowledgeNodeId = mistake.knowledgeNodeId,
+                practices = mistake.practices.map { practice ->
+                    MistakePracticeItem(
+                        id = practice.id,
+                        questionText = practice.questionText,
+                        answerReference = practice.answerReference,
+                        status = practice.status,
+                        studentAnswer = practice.studentAnswer,
+                        isCorrect = practice.isCorrect,
+                        validationMethod = practice.validationDetails["method"] as? String,
+                    )
+                },
                 studyStatus = mistake.studyStatus,
             )
         }
@@ -477,6 +502,20 @@ class NetworkAppRepository(
         correctedText: String,
     ) = apiCall {
         api.confirmMistakeOcr(mistakeId, taskId, OcrCorrectionDto(correctedText))
+        Unit
+    }
+
+    override suspend fun analyzeMistake(mistakeId: String): MistakeAnalysisOutcome = apiCall {
+        MistakeAnalysisOutcome(api.analyzeMistake(mistakeId).balance)
+    }
+
+    override suspend fun generateMistakePractice(mistakeId: String) = apiCall {
+        api.generateMistakePractice(mistakeId)
+        Unit
+    }
+
+    override suspend fun submitMistakePractice(mistakeId: String, practiceId: String, answer: String) = apiCall {
+        api.submitMistakePractice(mistakeId, practiceId, PracticeSubmitDto(answer.trim()))
         Unit
     }
 

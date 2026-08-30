@@ -23,7 +23,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Replay
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -48,6 +48,7 @@ import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.LearningItem
 import cn.qingkui.app.ui.model.MistakeDraftItem
 import cn.qingkui.app.ui.model.MistakeItem
+import cn.qingkui.app.ui.model.MistakePracticeItem
 import coil.compose.AsyncImage
 import java.io.File
 
@@ -65,6 +66,9 @@ fun LearningScreen(
     onCaptureMistake: () -> Unit,
     onRefreshMistakes: () -> Unit,
     onConfirmOcr: (String, String, String) -> Unit,
+    onAnalyzeMistake: (String) -> Unit,
+    onGeneratePractice: (String) -> Unit,
+    onSubmitPractice: (String, String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -94,11 +98,14 @@ fun LearningScreen(
                     onCapture = onCaptureMistake,
                     onRefresh = onRefreshMistakes,
                     onConfirm = onConfirmOcr,
+                    onAnalyze = onAnalyzeMistake,
+                    onGeneratePractice = onGeneratePractice,
+                    onSubmitPractice = onSubmitPractice,
                 )
             } else {
                 LearningFilters()
                 Spacer(Modifier.height(20.dp))
-                Divider(color = MaterialTheme.colorScheme.outline)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 if (items.isEmpty()) {
                     Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
                         Text("还没有学习记录", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -107,7 +114,7 @@ fun LearningScreen(
                     LazyColumn {
                         items(items, key = { it.nodeId }) { item ->
                             KnowledgeStateRow(item = item, onClick = { onOpenItem(item.nodeId) })
-                            Divider(color = MaterialTheme.colorScheme.outline)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                         }
                     }
                 }
@@ -189,9 +196,14 @@ private fun MistakeBookContent(
     onCapture: () -> Unit,
     onRefresh: () -> Unit,
     onConfirm: (String, String, String) -> Unit,
+    onAnalyze: (String) -> Unit,
+    onGeneratePractice: (String) -> Unit,
+    onSubmitPractice: (String, String, String) -> Unit,
 ) {
     var editing by remember { mutableStateOf<MistakeItem?>(null) }
     var correction by remember { mutableStateOf("") }
+    var answering by remember { mutableStateOf<Pair<MistakeItem, MistakePracticeItem>?>(null) }
+    var practiceAnswer by remember { mutableStateOf("") }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = onCapture) {
             Icon(Icons.Outlined.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -205,7 +217,7 @@ private fun MistakeBookContent(
         }
     }
     Spacer(Modifier.height(16.dp))
-    Divider(color = MaterialTheme.colorScheme.outline)
+    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
     val pendingDrafts = drafts.filter { it.status != "uploaded" }
     if (pendingDrafts.isEmpty() && mistakes.isEmpty()) {
         Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
@@ -223,7 +235,7 @@ private fun MistakeBookContent(
                         if (!draft.errorMessage.isNullOrBlank()) Text(draft.errorMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, maxLines = 2)
                     }
                 }
-                Divider(color = MaterialTheme.colorScheme.outline)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             }
             items(mistakes, key = { "remote-${it.id}" }) { item ->
                 Column(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
@@ -239,9 +251,49 @@ private fun MistakeBookContent(
                         if (item.requiresReview && item.ocrTaskId != null && item.ocrStatus == "succeeded") {
                             TextButton(onClick = { editing = item; correction = item.questionText }) { Text("校对确认") }
                         }
+                        if (!item.requiresReview && item.analysisStatus != "completed") {
+                            TextButton(onClick = { onAnalyze(item.id) }, enabled = !loading) { Text("分析错因") }
+                        }
+                        if (item.analysisStatus == "completed" && item.practices.isEmpty()) {
+                            TextButton(onClick = { onGeneratePractice(item.id) }, enabled = !loading) { Text("生成同类练习") }
+                        }
+                    }
+                    if (!item.analysisDiagnosis.isNullOrBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text("错因分析", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                        Text(item.analysisDiagnosis, style = MaterialTheme.typography.bodyMedium)
+                        if (!item.errorNote.isNullOrBlank()) {
+                            Text(item.errorNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        item.correctionSteps.forEachIndexed { index, step ->
+                            Text("${index + 1}. $step", style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (!item.knowledgeNodeId.isNullOrBlank()) {
+                            Text("关联知识点：${item.knowledgeNodeId}（待确认）", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    item.practices.forEach { practice ->
+                        Spacer(Modifier.height(10.dp))
+                        Text("同类练习", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Text(practice.questionText, style = MaterialTheme.typography.bodyMedium)
+                        if (practice.status == "pending") {
+                            TextButton(onClick = {
+                                answering = item to practice
+                                practiceAnswer = ""
+                            }) { Text("开始作答") }
+                        } else {
+                            Text(
+                                practiceResultLabel(practice),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (practice.isCorrect == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            )
+                            if (!practice.answerReference.isNullOrBlank()) {
+                                Text("参考：${practice.answerReference}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                     }
                 }
-                Divider(color = MaterialTheme.colorScheme.outline)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             }
         }
     }
@@ -265,6 +317,42 @@ private fun MistakeBookContent(
             dismissButton = { TextButton(onClick = { editing = null }) { Text("取消") } },
         )
     }
+    val practiceTarget = answering
+    if (practiceTarget != null) {
+        val (mistake, practice) = practiceTarget
+        AlertDialog(
+            onDismissRequest = { answering = null },
+            title = { Text("同类练习") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(practice.questionText, style = MaterialTheme.typography.bodyMedium)
+                    OutlinedTextField(
+                        value = practiceAnswer,
+                        onValueChange = { practiceAnswer = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        label = { Text("我的答案") },
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onSubmitPractice(mistake.id, practice.id, practiceAnswer)
+                        answering = null
+                    },
+                    enabled = practiceAnswer.isNotBlank(),
+                ) { Text("提交校验") }
+            },
+            dismissButton = { TextButton(onClick = { answering = null }) { Text("取消") } },
+        )
+    }
+}
+
+private fun practiceResultLabel(practice: MistakePracticeItem): String = when (practice.isCorrect) {
+    true -> if (practice.validationMethod == "self_report") "已提交自评" else "服务端校验通过"
+    false -> if (practice.validationMethod == "self_report") "自评需要订正" else "服务端校验未通过"
+    null -> "已提交，等待人工核验"
 }
 
 private fun draftStatusLabel(status: String): String = when (status) {

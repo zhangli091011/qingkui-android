@@ -166,7 +166,24 @@ data class MistakeItem(
     val confidence: Double?,
     val requiresReview: Boolean,
     val errorCategory: String?,
+    val errorNote: String?,
+    val analysisStatus: String,
+    val analysisDiagnosis: String?,
+    val correctionSteps: List<String>,
+    val knowledgeNodeId: String?,
+    val practices: List<MistakePracticeItem>,
     val studyStatus: String,
+)
+
+@Immutable
+data class MistakePracticeItem(
+    val id: String,
+    val questionText: String,
+    val answerReference: String?,
+    val status: String,
+    val studentAnswer: String?,
+    val isCorrect: Boolean?,
+    val validationMethod: String?,
 )
 
 @Immutable
