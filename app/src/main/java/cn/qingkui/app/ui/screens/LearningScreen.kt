@@ -37,6 +37,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material.icons.outlined.AddAPhoto
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -258,7 +259,13 @@ private fun MistakeBookContent(
         LazyColumn {
             items(pendingDrafts, key = { "draft-${it.id}" }) { draft ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    AsyncImage(model = File(draft.imagePath), contentDescription = null, modifier = Modifier.size(72.dp).background(MaterialTheme.colorScheme.surfaceVariant))
+                    if (draft.imagePath.isNotBlank()) {
+                        AsyncImage(model = File(draft.imagePath), contentDescription = null, modifier = Modifier.size(72.dp).background(MaterialTheme.colorScheme.surfaceVariant))
+                    } else {
+                        Box(Modifier.size(72.dp).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                            Icon(Icons.Outlined.EditNote, contentDescription = "手动输入题目")
+                        }
+                    }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(draft.questionText.ifBlank { "图片题目待识别" }, style = MaterialTheme.typography.bodyLarge, maxLines = 2)

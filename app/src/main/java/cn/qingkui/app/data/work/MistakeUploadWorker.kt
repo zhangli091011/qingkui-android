@@ -21,9 +21,13 @@ class MistakeUploadWorker(
         val draftId = inputData.getString(KEY_DRAFT_ID) ?: return Result.failure()
         val dao = MistakeDatabase.get(applicationContext).drafts()
         val draft = dao.get(draftId) ?: return Result.success()
-        val image = File(draft.imagePath)
-        if (!image.isFile) {
+        val image = draft.imagePath.takeIf { it.isNotBlank() }?.let(::File)
+        if (image != null && !image.isFile) {
             dao.updateStatus(draftId, "failed", "本地图片已不存在")
+            return Result.failure()
+        }
+        if (image == null && draft.questionText.isBlank()) {
+            dao.updateStatus(draftId, "failed", "手动题目内容为空")
             return Result.failure()
         }
         dao.updateStatus(draftId, "uploading", null)
@@ -37,6 +41,10 @@ class MistakeUploadWorker(
                     questionGoal = draft.questionGoal.ifBlank { "识别图片中的题目并分析错因" },
                 ),
             ).id
+            if (image == null) {
+                dao.markUploaded(draftId, mistakeId, null)
+                return Result.success()
+            }
             val mime = when (image.extension.lowercase()) {
                 "png" -> "image/png"
                 "webp" -> "image/webp"

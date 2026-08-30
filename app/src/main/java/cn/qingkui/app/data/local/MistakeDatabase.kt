@@ -46,7 +46,7 @@ interface MistakeDraftDao {
     suspend fun updateStatus(id: String, status: String, error: String?, updatedAt: Long = System.currentTimeMillis())
 
     @Query("UPDATE mistake_drafts SET remoteId = :remoteId, ocrTaskId = :taskId, status = 'uploaded', errorMessage = NULL, updatedAt = :updatedAt WHERE id = :id")
-    suspend fun markUploaded(id: String, remoteId: String, taskId: String, updatedAt: Long = System.currentTimeMillis())
+    suspend fun markUploaded(id: String, remoteId: String, taskId: String?, updatedAt: Long = System.currentTimeMillis())
 
     @Query("DELETE FROM mistake_drafts WHERE id = :id")
     suspend fun delete(id: String)

@@ -205,7 +205,11 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
                         mistakeCaptureOpen = false,
                         destination = AppDestination.Learning,
                         learningShowsMistakes = true,
-                        errorMessage = "图片已保存，将在网络可用时上传识别",
+                        errorMessage = if (imagePath.isBlank()) {
+                            "手动题目已保存，将在网络可用时同步"
+                        } else {
+                            "图片已保存，将在网络可用时上传识别"
+                        },
                     )
                 }
             } catch (error: Exception) {

@@ -122,6 +122,25 @@ class AppViewModelTest {
     }
 
     @Test
+    fun manualMistakeDraftIsSavedWithoutAnImage() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository()
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+
+            viewModel.saveMistakeDraft("", "数学", "求函数的定义域", "", "分析错因")
+            advanceUntilIdle()
+
+            assertEquals(listOf(""), repository.savedDraftImagePaths)
+            assertEquals("手动题目已保存，将在网络可用时同步", viewModel.uiState.value.errorMessage)
+            assertTrue(viewModel.uiState.value.learningShowsMistakes)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun accountDeviceSessionCanBeRevoked() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
@@ -254,6 +273,7 @@ private class FakeRepository(
     val cancelledOcrTasks = mutableListOf<Pair<String, String>>()
     val retriedOcrTasks = mutableListOf<Pair<String, String>>()
     val deletedMistakes = mutableListOf<String>()
+    val savedDraftImagePaths = mutableListOf<String>()
 
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null
@@ -328,7 +348,9 @@ private class FakeRepository(
         questionText: String,
         studentWork: String,
         questionGoal: String,
-    ) = Unit
+    ) {
+        savedDraftImagePaths += imagePath
+    }
     override suspend fun retryMistakeDraft(draftId: String) { retriedDrafts += draftId }
     override suspend fun deleteMistakeDraft(draftId: String) = Unit
     override suspend fun cancelMistakeOcr(mistakeId: String, taskId: String) { cancelledOcrTasks += mistakeId to taskId }

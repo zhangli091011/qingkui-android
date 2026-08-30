@@ -441,7 +441,7 @@ class NetworkAppRepository(
         val response = api.mistakes()
         val remoteIds = response.mapTo(mutableSetOf()) { it.id }
         draftDao.all().filter { it.status == "uploaded" && it.remoteId in remoteIds }.forEach { draft ->
-            File(draft.imagePath).delete()
+            if (draft.imagePath.isNotBlank()) File(draft.imagePath).delete()
             draftDao.delete(draft.id)
         }
         response.map { mistake ->
