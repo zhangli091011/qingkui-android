@@ -18,21 +18,38 @@ import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.LearningFilter
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-class AppViewModel(private val repository: AppRepository) : ViewModel() {
+class AppViewModel(
+    private val repository: AppRepository,
+    private val mistakePollIntervalMillis: Long = 3_000,
+    private val mistakePollMaxAttempts: Int = 40,
+) : ViewModel() {
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
+    private var mistakePollingJob: Job? = null
 
     init {
         viewModelScope.launch {
             repository.observeMistakeDrafts().collectLatest { drafts ->
                 _uiState.update { it.copy(mistakeDrafts = drafts) }
+                val state = _uiState.value
+                if (
+                    drafts.any { it.status == "uploaded" } &&
+                    state.authenticated &&
+                    state.destination == AppDestination.Learning &&
+                    state.learningShowsMistakes
+                ) {
+                    refreshMistakes()
+                }
             }
         }
         viewModelScope.launch {
@@ -153,9 +170,13 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
 
     fun selectDestination(destination: AppDestination) {
         _uiState.update { it.copy(destination = destination, drawerOpen = false) }
+        reconcileMistakePolling(_uiState.value.mistakes)
     }
 
-    fun showLearningRecords() = _uiState.update { it.copy(learningShowsMistakes = false) }
+    fun showLearningRecords() {
+        _uiState.update { it.copy(learningShowsMistakes = false) }
+        stopMistakePolling()
+    }
 
     fun selectLearningFilter(filter: LearningFilter) {
         if (_uiState.value.learningFilter == filter) return
@@ -225,10 +246,56 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
             try {
                 val items = repository.mistakes()
                 _uiState.update { it.copy(mistakes = items, mistakeLoading = false) }
+                reconcileMistakePolling(items)
             } catch (error: Exception) {
                 handleApiError(error) { it.copy(mistakeLoading = false) }
             }
         }
+    }
+
+    private fun reconcileMistakePolling(items: List<cn.qingkui.app.ui.model.MistakeItem>) {
+        val state = _uiState.value
+        val visible = state.authenticated &&
+            state.destination == AppDestination.Learning &&
+            state.learningShowsMistakes
+        if (!visible || items.none { it.ocrStatus in OCR_PENDING_STATUSES }) {
+            stopMistakePolling()
+            return
+        }
+        if (mistakePollingJob?.isActive == true) return
+        mistakePollingJob = viewModelScope.launch {
+            try {
+                repeat(mistakePollMaxAttempts) {
+                    delay(mistakePollIntervalMillis)
+                    val current = _uiState.value
+                    if (
+                        !current.authenticated ||
+                        current.destination != AppDestination.Learning ||
+                        !current.learningShowsMistakes
+                    ) return@launch
+                    val refreshed = try {
+                        repository.mistakes()
+                    } catch (error: Exception) {
+                        if (error is ApiFailureException && error.statusCode == 401) {
+                            handleApiError(error) { it.copy(mistakeLoading = false) }
+                            return@launch
+                        }
+                        return@repeat
+                    }
+                    _uiState.update { it.copy(mistakes = refreshed, mistakeLoading = false) }
+                    if (refreshed.none { it.ocrStatus in OCR_PENDING_STATUSES }) return@launch
+                }
+            } finally {
+                if (mistakePollingJob === currentCoroutineContext()[Job]) {
+                    mistakePollingJob = null
+                }
+            }
+        }
+    }
+
+    private fun stopMistakePolling() {
+        mistakePollingJob?.cancel()
+        mistakePollingJob = null
     }
 
     fun confirmMistakeOcr(mistakeId: String, taskId: String, correctedText: String) {
@@ -580,6 +647,7 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
     }
 
     fun logout() {
+        stopMistakePolling()
         viewModelScope.launch {
             repository.logout()
             _uiState.value = AppUiState(
@@ -608,6 +676,8 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
     }
 
     companion object {
+        private val OCR_PENDING_STATUSES = setOf("queued", "recognizing")
+
         fun factory(context: Context): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =

@@ -257,7 +257,50 @@ class AppViewModelTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun mistakeBookPollsQueuedOcrUntilItFinishes() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository()
+            val viewModel = AppViewModel(
+                repository,
+                mistakePollIntervalMillis = 100,
+                mistakePollMaxAttempts = 5,
+            )
+            advanceUntilIdle()
+            repository.mistakeResponses += listOf(mistakeWithStatus("queued"))
+            repository.mistakeResponses += listOf(mistakeWithStatus("succeeded"))
+
+            viewModel.selectDestination(AppDestination.Learning)
+            viewModel.showMistakeBook()
+            advanceUntilIdle()
+
+            assertEquals("succeeded", viewModel.uiState.value.mistakes.single().ocrStatus)
+            assertEquals(3, repository.mistakeCalls)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
 }
+
+private fun mistakeWithStatus(status: String) = MistakeItem(
+    id = "polling-mistake",
+    subject = "数学",
+    questionText = "测试 OCR 状态刷新",
+    ocrTaskId = "polling-task",
+    ocrStatus = status,
+    confidence = null,
+    requiresReview = false,
+    errorCategory = null,
+    errorNote = null,
+    analysisStatus = "not_started",
+    analysisDiagnosis = null,
+    correctionSteps = emptyList(),
+    knowledgeNodeId = null,
+    practices = emptyList(),
+    studyStatus = "new",
+)
 
 private class FakeRepository(
     private val answerBalance: Int = 1280,
@@ -274,6 +317,8 @@ private class FakeRepository(
     val retriedOcrTasks = mutableListOf<Pair<String, String>>()
     val deletedMistakes = mutableListOf<String>()
     val savedDraftImagePaths = mutableListOf<String>()
+    val mistakeResponses = mutableListOf<List<MistakeItem>>()
+    var mistakeCalls = 0
 
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null
@@ -341,7 +386,10 @@ private class FakeRepository(
 
     override suspend fun submitAnswerFeedback(messageId: String?, helpful: Boolean) = Unit
     override fun observeMistakeDrafts(): Flow<List<MistakeDraftItem>> = flowOf(emptyList())
-    override suspend fun mistakes(): List<MistakeItem> = emptyList()
+    override suspend fun mistakes(): List<MistakeItem> {
+        mistakeCalls += 1
+        return if (mistakeResponses.isEmpty()) emptyList() else mistakeResponses.removeAt(0)
+    }
     override suspend fun saveMistakeDraft(
         imagePath: String,
         subject: String,
