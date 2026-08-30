@@ -2,6 +2,8 @@ package cn.qingkui.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.LearningItem
+import cn.qingkui.app.ui.model.LearningFilter
 import cn.qingkui.app.ui.model.MistakeDraftItem
 import cn.qingkui.app.ui.model.MistakeItem
 import cn.qingkui.app.ui.model.MistakePracticeItem
@@ -56,12 +59,14 @@ import java.io.File
 fun LearningScreen(
     compact: Boolean,
     items: List<LearningItem>,
+    selectedFilter: LearningFilter,
     mistakeDrafts: List<MistakeDraftItem>,
     mistakes: List<MistakeItem>,
     showMistakes: Boolean,
     mistakeLoading: Boolean,
     onOpenItem: (String) -> Unit,
     onShowLearning: () -> Unit,
+    onFilterChange: (LearningFilter) -> Unit,
     onShowMistakes: () -> Unit,
     onCaptureMistake: () -> Unit,
     onRefreshMistakes: () -> Unit,
@@ -103,7 +108,7 @@ fun LearningScreen(
                     onSubmitPractice = onSubmitPractice,
                 )
             } else {
-                LearningFilters()
+                LearningFilters(selectedFilter = selectedFilter, onFilterChange = onFilterChange)
                 Spacer(Modifier.height(20.dp))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 if (items.isEmpty()) {
@@ -124,20 +129,27 @@ fun LearningScreen(
 }
 
 @Composable
-private fun LearningFilters() {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip("最近探索", Icons.Outlined.History, true)
-        FilterChip("复习中", Icons.Outlined.Replay, false)
-        FilterChip("易错", Icons.Outlined.ErrorOutline, false)
-        FilterChip("已验证", Icons.Outlined.CheckCircle, false)
+private fun LearningFilters(
+    selectedFilter: LearningFilter,
+    onFilterChange: (LearningFilter) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip("最近学习", Icons.Outlined.History, selectedFilter == LearningFilter.Recent) { onFilterChange(LearningFilter.Recent) }
+        FilterChip("待复习", Icons.Outlined.Replay, selectedFilter == LearningFilter.Review) { onFilterChange(LearningFilter.Review) }
+        FilterChip("易错", Icons.Outlined.ErrorOutline, selectedFilter == LearningFilter.ErrorProne) { onFilterChange(LearningFilter.ErrorProne) }
+        FilterChip("已验证", Icons.Outlined.CheckCircle, selectedFilter == LearningFilter.Verified) { onFilterChange(LearningFilter.Verified) }
     }
 }
 
 @Composable
-private fun FilterChip(label: String, icon: ImageVector, selected: Boolean) {
+private fun FilterChip(label: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .height(40.dp)
+            .clickable(onClick = onClick)
             .background(
                 if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                 RoundedCornerShape(8.dp),

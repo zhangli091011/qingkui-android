@@ -176,6 +176,7 @@ fun QingkuiApp() {
                     AppDestination.Learning -> LearningScreen(
                         compact = compact,
                         items = uiState.learningItems,
+                        selectedFilter = uiState.learningFilter,
                         mistakeDrafts = uiState.mistakeDrafts,
                         mistakes = uiState.mistakes,
                         showMistakes = uiState.learningShowsMistakes,
@@ -185,6 +186,7 @@ fun QingkuiApp() {
                             viewModel.selectDestination(AppDestination.Graph)
                         },
                         onShowLearning = viewModel::showLearningRecords,
+                        onFilterChange = viewModel::selectLearningFilter,
                         onShowMistakes = viewModel::showMistakeBook,
                         onCaptureMistake = viewModel::openMistakeCapture,
                         onRefreshMistakes = viewModel::refreshMistakes,

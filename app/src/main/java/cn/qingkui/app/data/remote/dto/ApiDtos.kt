@@ -183,6 +183,7 @@ data class LearningSummaryDto(
     val recent: List<LearningSummaryItemDto> = emptyList(),
     val review: List<LearningSummaryItemDto> = emptyList(),
     @SerializedName("error_prone") val errorProne: List<LearningSummaryItemDto> = emptyList(),
+    val verified: List<LearningSummaryItemDto> = emptyList(),
 )
 
 data class LearningEventCreate(

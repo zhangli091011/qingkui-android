@@ -10,6 +10,8 @@ import cn.qingkui.app.ui.model.CreditLedgerItem
 import cn.qingkui.app.ui.model.DeviceSessionItem
 import cn.qingkui.app.ui.model.FeedbackItem
 import cn.qingkui.app.ui.model.LearningItem
+import cn.qingkui.app.ui.model.LearningFilter
+import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.MessageAuthor
 import cn.qingkui.app.ui.model.MistakeDraftItem
 import cn.qingkui.app.ui.model.MistakeItem
@@ -174,6 +176,25 @@ class AppViewModelTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun learningFilterLoadsTheMatchingServerCollection() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository()
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+
+            viewModel.selectLearningFilter(LearningFilter.Verified)
+            advanceUntilIdle()
+
+            assertEquals(LearningFilter.Verified, viewModel.uiState.value.learningFilter)
+            assertEquals(listOf("verified-node"), viewModel.uiState.value.learningItems.map { it.nodeId })
+            assertEquals(LearningFilter.Verified, repository.lastLearningFilter)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
 }
 
 private class FakeRepository(
@@ -184,6 +205,7 @@ private class FakeRepository(
     val revokedSessions = mutableListOf<String>()
     val feedbackSubmissions = mutableListOf<Pair<String, String>>()
     val analyzedMistakes = mutableListOf<String>()
+    var lastLearningFilter = LearningFilter.Recent
 
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null
@@ -210,7 +232,14 @@ private class FakeRepository(
     override suspend fun sessions() = emptyList<cn.qingkui.app.ui.model.ConversationSummary>()
     override suspend fun restoreSession(sessionId: String) = emptyList<ChatMessage>()
     override suspend fun deleteSession(sessionId: String) = Unit
-    override suspend fun learningItems(): List<LearningItem> = emptyList()
+    override suspend fun learningItems(filter: LearningFilter): List<LearningItem> {
+        lastLearningFilter = filter
+        return if (filter == LearningFilter.Verified) {
+            listOf(LearningItem("verified-node", "已验证知识点", KnowledgeStatus.Verified, "刚刚", "回到图谱"))
+        } else {
+            emptyList()
+        }
+    }
     override suspend fun updateNodeState(nodeId: String, status: cn.qingkui.app.ui.model.KnowledgeStatus, note: String?, favorite: Boolean?) = null
     override suspend fun recordLearningEvent(nodeId: String, eventType: String, data: Map<String, Any?>) = Unit
     override suspend fun changePassword(current: String, next: String) = Unit

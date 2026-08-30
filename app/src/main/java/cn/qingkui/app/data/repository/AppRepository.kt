@@ -41,6 +41,7 @@ import cn.qingkui.app.ui.model.KnowledgeRelation
 import cn.qingkui.app.ui.model.KnowledgeSource
 import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.LearningItem
+import cn.qingkui.app.ui.model.LearningFilter
 import cn.qingkui.app.ui.model.MessageAuthor
 import cn.qingkui.app.ui.model.MessageCitation
 import cn.qingkui.app.ui.model.MistakeDraftItem
@@ -100,7 +101,7 @@ interface AppRepository {
     suspend fun sessions(): List<ConversationSummary>
     suspend fun restoreSession(sessionId: String): List<ChatMessage>
     suspend fun deleteSession(sessionId: String)
-    suspend fun learningItems(): List<LearningItem>
+    suspend fun learningItems(filter: LearningFilter = LearningFilter.Recent): List<LearningItem>
     suspend fun updateNodeState(nodeId: String, status: KnowledgeStatus, note: String?, favorite: Boolean?): LearningItem?
     suspend fun recordLearningEvent(nodeId: String, eventType: String, data: Map<String, Any?> = emptyMap())
     suspend fun changePassword(current: String, next: String)
@@ -263,8 +264,15 @@ class NetworkAppRepository(
         if (!response.isSuccessful) throw ApiFailureException(response.code(), "删除会话失败")
     }
 
-    override suspend fun learningItems(): List<LearningItem> = apiCall {
-        api.learningSummary().recent.map { item ->
+    override suspend fun learningItems(filter: LearningFilter): List<LearningItem> = apiCall {
+        val summary = api.learningSummary()
+        val source = when (filter) {
+            LearningFilter.Recent -> summary.recent
+            LearningFilter.Review -> summary.review
+            LearningFilter.ErrorProne -> summary.errorProne
+            LearningFilter.Verified -> summary.verified
+        }
+        source.map { item ->
             val status = item.status.toKnowledgeStatus()
             LearningItem(
                 nodeId = item.id,

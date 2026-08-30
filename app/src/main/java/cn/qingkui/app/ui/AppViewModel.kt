@@ -15,6 +15,7 @@ import cn.qingkui.app.ui.model.MessageAuthor
 import cn.qingkui.app.ui.model.QaHelpLevel
 import cn.qingkui.app.ui.model.QaMode
 import cn.qingkui.app.ui.model.KnowledgeStatus
+import cn.qingkui.app.ui.model.LearningFilter
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -96,7 +97,7 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
             val (credits, graph, learning, sessions, ledger, mistakes) = coroutineScope {
                 val creditTask = async { repository.credits() }
                 val graphTask = async { repository.graph() }
-                val learningTask = async { repository.learningItems() }
+                val learningTask = async { repository.learningItems(_uiState.value.learningFilter) }
                 val sessionsTask = async { repository.sessions() }
                 val ledgerTask = async { repository.creditLedger() }
                 val mistakesTask = async { repository.mistakes() }
@@ -153,6 +154,25 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
     }
 
     fun showLearningRecords() = _uiState.update { it.copy(learningShowsMistakes = false) }
+
+    fun selectLearningFilter(filter: LearningFilter) {
+        if (_uiState.value.learningFilter == filter) return
+        _uiState.update { it.copy(learningFilter = filter, contentLoading = true, errorMessage = null) }
+        viewModelScope.launch {
+            try {
+                val items = repository.learningItems(filter)
+                _uiState.update { state ->
+                    if (state.learningFilter == filter) {
+                        state.copy(learningItems = items, contentLoading = false)
+                    } else {
+                        state
+                    }
+                }
+            } catch (error: Exception) {
+                handleApiError(error) { it.copy(contentLoading = false) }
+            }
+        }
+    }
     fun showMistakeBook() {
         _uiState.update { it.copy(learningShowsMistakes = true) }
         refreshMistakes()

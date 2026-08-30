@@ -110,6 +110,13 @@ data class LearningItem(
     val action: String,
 )
 
+enum class LearningFilter(val label: String) {
+    Recent("最近学习"),
+    Review("待复习"),
+    ErrorProne("易错"),
+    Verified("已验证"),
+}
+
 @Immutable
 data class ConversationSummary(
     val id: String,
@@ -214,6 +221,7 @@ data class AppUiState(
     val graphNodes: List<KnowledgeNode> = emptyList(),
     val graphRelations: List<KnowledgeRelation> = emptyList(),
     val learningItems: List<LearningItem> = emptyList(),
+    val learningFilter: LearningFilter = LearningFilter.Recent,
     val sessions: List<ConversationSummary> = emptyList(),
     val ledger: List<CreditLedgerItem> = emptyList(),
     val deviceSessions: List<DeviceSessionItem> = emptyList(),
