@@ -33,6 +33,13 @@ import retrofit2.http.Query
 import retrofit2.Response
 import retrofit2.http.Streaming
 import okhttp3.ResponseBody
+import okhttp3.MultipartBody
+import retrofit2.http.Multipart
+import retrofit2.http.Part
+import cn.qingkui.app.data.remote.dto.MistakeCreateDto
+import cn.qingkui.app.data.remote.dto.MistakeDto
+import cn.qingkui.app.data.remote.dto.OcrCorrectionDto
+import cn.qingkui.app.data.remote.dto.OcrTaskDto
 
 interface QingkuiApi {
     @POST("auth/register")
@@ -101,4 +108,24 @@ interface QingkuiApi {
 
     @POST("feedback")
     suspend fun submitFeedback(@Body body: FeedbackCreate): FeedbackDto
+
+    @POST("mistakes")
+    suspend fun createMistake(@Body body: MistakeCreateDto): MistakeDto
+
+    @GET("mistakes")
+    suspend fun mistakes(@Query("limit") limit: Int = 100): List<MistakeDto>
+
+    @Multipart
+    @POST("mistakes/{id}/images")
+    suspend fun uploadMistakeImage(
+        @Path("id") mistakeId: String,
+        @Part image: MultipartBody.Part,
+    ): OcrTaskDto
+
+    @POST("mistakes/{mistakeId}/ocr/{taskId}/confirm")
+    suspend fun confirmMistakeOcr(
+        @Path("mistakeId") mistakeId: String,
+        @Path("taskId") taskId: String,
+        @Body body: OcrCorrectionDto,
+    ): MistakeDto
 }

@@ -8,6 +8,8 @@ import cn.qingkui.app.ui.model.ChatMessage
 import cn.qingkui.app.ui.model.CreditLedgerItem
 import cn.qingkui.app.ui.model.LearningItem
 import cn.qingkui.app.ui.model.MessageAuthor
+import cn.qingkui.app.ui.model.MistakeDraftItem
+import cn.qingkui.app.ui.model.MistakeItem
 import cn.qingkui.app.ui.model.QaHelpLevel
 import cn.qingkui.app.ui.model.QaMode
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +19,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -97,6 +101,20 @@ class AppViewModelTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun guestCannotOpenMistakeCameraWithoutLogin() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val viewModel = AppViewModel(FakeRepository(authenticated = false))
+            advanceUntilIdle()
+            viewModel.openMistakeCapture()
+            assertTrue(viewModel.uiState.value.authScreenOpen)
+            assertEquals(false, viewModel.uiState.value.mistakeCaptureOpen)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
 }
 
 private class FakeRepository(
@@ -144,4 +162,14 @@ private class FakeRepository(
     }
 
     override suspend fun submitAnswerFeedback(messageId: String?, helpful: Boolean) = Unit
+    override fun observeMistakeDrafts(): Flow<List<MistakeDraftItem>> = flowOf(emptyList())
+    override suspend fun mistakes(): List<MistakeItem> = emptyList()
+    override suspend fun saveMistakeDraft(
+        imagePath: String,
+        subject: String,
+        questionText: String,
+        studentWork: String,
+        questionGoal: String,
+    ) = Unit
+    override suspend fun confirmMistakeOcr(mistakeId: String, taskId: String, correctedText: String) = Unit
 }

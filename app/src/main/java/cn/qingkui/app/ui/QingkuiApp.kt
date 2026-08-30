@@ -23,7 +23,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
@@ -41,7 +40,7 @@ import cn.qingkui.app.ui.screens.AuthScreen
 import cn.qingkui.app.ui.screens.ChatScreen
 import cn.qingkui.app.ui.screens.KnowledgeGraphScreen
 import cn.qingkui.app.ui.screens.LearningScreen
-import kotlinx.coroutines.launch
+import cn.qingkui.app.ui.screens.MistakeCaptureScreen
 
 @Composable
 fun QingkuiApp() {
@@ -51,7 +50,6 @@ fun QingkuiApp() {
     val darkTheme = isSystemInDarkTheme()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
 
     if (uiState.authChecking) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
@@ -74,6 +72,14 @@ fun QingkuiApp() {
             onNicknameChange = viewModel::updateNickname,
             onSubmit = viewModel::submitAuth,
             onBack = viewModel::closeAuth,
+        )
+        return
+    }
+
+    if (uiState.mistakeCaptureOpen) {
+        MistakeCaptureScreen(
+            onClose = viewModel::closeMistakeCapture,
+            onSave = viewModel::saveMistakeDraft,
         )
         return
     }
@@ -151,11 +157,7 @@ fun QingkuiApp() {
                         onSend = viewModel::sendMessage,
                         onFeedback = viewModel::submitAnswerFeedback,
                         onRetry = viewModel::retryAnswer,
-                        onAttach = {
-                            scope.launch {
-                                snackbarHostState.showSnackbar("图片提问将在 V1.1 接入，文字问答可正常使用")
-                            }
-                        },
+                        onAttach = viewModel::openMistakeCapture,
                     )
                     AppDestination.Graph -> KnowledgeGraphScreen(
                         compact = compact,
@@ -174,10 +176,19 @@ fun QingkuiApp() {
                     AppDestination.Learning -> LearningScreen(
                         compact = compact,
                         items = uiState.learningItems,
+                        mistakeDrafts = uiState.mistakeDrafts,
+                        mistakes = uiState.mistakes,
+                        showMistakes = uiState.learningShowsMistakes,
+                        mistakeLoading = uiState.mistakeLoading,
                         onOpenItem = { nodeId ->
                             viewModel.selectNode(nodeId)
                             viewModel.selectDestination(AppDestination.Graph)
                         },
+                        onShowLearning = viewModel::showLearningRecords,
+                        onShowMistakes = viewModel::showMistakeBook,
+                        onCaptureMistake = viewModel::openMistakeCapture,
+                        onRefreshMistakes = viewModel::refreshMistakes,
+                        onConfirmOcr = viewModel::confirmMistakeOcr,
                     )
                     AppDestination.Account -> AccountScreen(
                         compact = compact,

@@ -174,3 +174,42 @@ data class LearningEventCreate(
 
 data class LearningEventDto(val id: String)
 data class ApiErrorDto(val detail: String?)
+
+data class MistakeCreateDto(
+    val subject: String?,
+    @SerializedName("question_text") val questionText: String?,
+    @SerializedName("student_work") val studentWork: String?,
+    @SerializedName("question_goal") val questionGoal: String?,
+)
+
+data class OcrCorrectionDto(@SerializedName("corrected_text") val correctedText: String)
+
+data class MistakeAssetDto(
+    val id: String,
+    @SerializedName("mime_type") val mimeType: String,
+    val status: String,
+)
+
+data class OcrTaskDto(
+    val id: String,
+    @SerializedName("asset_id") val assetId: String,
+    val status: String,
+    @SerializedName("result_text") val resultText: String? = null,
+    val confidence: Double? = null,
+    @SerializedName("requires_review") val requiresReview: Boolean = true,
+    @SerializedName("error_message") val errorMessage: String? = null,
+)
+
+data class MistakeDto(
+    val id: String,
+    val subject: String? = null,
+    @SerializedName("question_text") val questionText: String? = null,
+    @SerializedName("corrected_text") val correctedText: String? = null,
+    @SerializedName("student_work") val studentWork: String? = null,
+    @SerializedName("error_category") val errorCategory: String? = null,
+    @SerializedName("review_status") val reviewStatus: String,
+    @SerializedName("study_status") val studyStatus: String,
+    @SerializedName("created_at") val createdAt: String,
+    val assets: List<MistakeAssetDto> = emptyList(),
+    @SerializedName("ocr_tasks") val ocrTasks: List<OcrTaskDto> = emptyList(),
+)

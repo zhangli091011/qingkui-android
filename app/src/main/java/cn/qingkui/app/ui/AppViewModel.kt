@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class AppViewModel(private val repository: AppRepository) : ViewModel() {
@@ -28,6 +29,11 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            repository.observeMistakeDrafts().collectLatest { drafts ->
+                _uiState.update { it.copy(mistakeDrafts = drafts) }
+            }
+        }
         viewModelScope.launch {
             val hasSession = repository.hasSession()
             _uiState.update {
@@ -87,13 +93,14 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
     private suspend fun refreshContentNow() {
         _uiState.update { it.copy(contentLoading = true, errorMessage = null) }
         try {
-            val (credits, graph, learning, sessions, ledger) = coroutineScope {
+            val (credits, graph, learning, sessions, ledger, mistakes) = coroutineScope {
                 val creditTask = async { repository.credits() }
                 val graphTask = async { repository.graph() }
                 val learningTask = async { repository.learningItems() }
                 val sessionsTask = async { repository.sessions() }
                 val ledgerTask = async { repository.creditLedger() }
-                Quintuple(creditTask.await(), graphTask.await(), learningTask.await(), sessionsTask.await(), ledgerTask.await())
+                val mistakesTask = async { repository.mistakes() }
+                Sextuple(creditTask.await(), graphTask.await(), learningTask.await(), sessionsTask.await(), ledgerTask.await(), mistakesTask.await())
             }
             _uiState.update {
                 it.copy(
@@ -105,6 +112,7 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
                     learningItems = learning,
                     sessions = sessions,
                     ledger = ledger,
+                    mistakes = mistakes,
                     contentLoading = false,
                 )
             }
@@ -115,6 +123,71 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
 
     fun selectDestination(destination: AppDestination) {
         _uiState.update { it.copy(destination = destination, drawerOpen = false) }
+    }
+
+    fun showLearningRecords() = _uiState.update { it.copy(learningShowsMistakes = false) }
+    fun showMistakeBook() {
+        _uiState.update { it.copy(learningShowsMistakes = true) }
+        refreshMistakes()
+    }
+
+    fun openMistakeCapture() {
+        if (!_uiState.value.authenticated) {
+            openAuth()
+            return
+        }
+        _uiState.update { it.copy(mistakeCaptureOpen = true, errorMessage = null) }
+    }
+
+    fun closeMistakeCapture() = _uiState.update { it.copy(mistakeCaptureOpen = false) }
+
+    fun saveMistakeDraft(
+        imagePath: String,
+        subject: String,
+        questionText: String,
+        studentWork: String,
+        questionGoal: String,
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.saveMistakeDraft(imagePath, subject, questionText, studentWork, questionGoal)
+                _uiState.update {
+                    it.copy(
+                        mistakeCaptureOpen = false,
+                        destination = AppDestination.Learning,
+                        learningShowsMistakes = true,
+                        errorMessage = "图片已保存，将在网络可用时上传识别",
+                    )
+                }
+            } catch (error: Exception) {
+                handleApiError(error) { it.copy(mistakeCaptureOpen = true) }
+            }
+        }
+    }
+
+    fun refreshMistakes() {
+        if (!_uiState.value.authenticated) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(mistakeLoading = true) }
+            try {
+                val items = repository.mistakes()
+                _uiState.update { it.copy(mistakes = items, mistakeLoading = false) }
+            } catch (error: Exception) {
+                handleApiError(error) { it.copy(mistakeLoading = false) }
+            }
+        }
+    }
+
+    fun confirmMistakeOcr(mistakeId: String, taskId: String, correctedText: String) {
+        if (correctedText.isBlank()) return
+        viewModelScope.launch {
+            try {
+                repository.confirmMistakeOcr(mistakeId, taskId, correctedText.trim())
+                refreshMistakes()
+            } catch (error: Exception) {
+                handleApiError(error) { it }
+            }
+        }
     }
 
     fun updateDraft(value: String) = _uiState.update { it.copy(draft = value, errorMessage = null) }
@@ -348,4 +421,11 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
     }
 }
 
-private data class Quintuple<A, B, C, D, E>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E)
+private data class Sextuple<A, B, C, D, E, F>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D,
+    val fifth: E,
+    val sixth: F,
+)

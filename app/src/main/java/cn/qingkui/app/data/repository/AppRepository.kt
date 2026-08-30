@@ -1,7 +1,16 @@
 package cn.qingkui.app.data.repository
 
 import android.content.Context
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
+import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import cn.qingkui.app.data.auth.TokenStore
+import cn.qingkui.app.data.local.MistakeDatabase
+import cn.qingkui.app.data.local.MistakeDraftEntity
 import cn.qingkui.app.data.remote.NetworkModule
 import cn.qingkui.app.data.remote.QingkuiApi
 import cn.qingkui.app.data.remote.dto.ApiErrorDto
@@ -17,7 +26,9 @@ import cn.qingkui.app.data.remote.dto.LoginRequest
 import cn.qingkui.app.data.remote.dto.LogoutRequest
 import cn.qingkui.app.data.remote.dto.MessageCreate
 import cn.qingkui.app.data.remote.dto.NeighborNodeDto
+import cn.qingkui.app.data.remote.dto.OcrCorrectionDto
 import cn.qingkui.app.data.remote.dto.RegisterRequest
+import cn.qingkui.app.data.work.MistakeUploadWorker
 import cn.qingkui.app.ui.model.ChatMessage
 import cn.qingkui.app.ui.model.ConversationSummary
 import cn.qingkui.app.ui.model.CreditLedgerItem
@@ -29,6 +40,8 @@ import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.LearningItem
 import cn.qingkui.app.ui.model.MessageAuthor
 import cn.qingkui.app.ui.model.MessageCitation
+import cn.qingkui.app.ui.model.MistakeDraftItem
+import cn.qingkui.app.ui.model.MistakeItem
 import cn.qingkui.app.ui.model.QaHelpLevel
 import cn.qingkui.app.ui.model.QaMode
 import cn.qingkui.app.ui.model.RelationType
@@ -37,8 +50,13 @@ import com.google.gson.JsonParser
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import retrofit2.HttpException
 import java.io.IOException
+import java.io.File
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -86,13 +104,25 @@ interface AppRepository {
         onDelta: (String) -> Unit,
     ): QaAnswer
     suspend fun submitAnswerFeedback(messageId: String?, helpful: Boolean)
+    fun observeMistakeDrafts(): Flow<List<MistakeDraftItem>>
+    suspend fun mistakes(): List<MistakeItem>
+    suspend fun saveMistakeDraft(
+        imagePath: String,
+        subject: String,
+        questionText: String,
+        studentWork: String,
+        questionGoal: String,
+    )
+    suspend fun confirmMistakeOcr(mistakeId: String, taskId: String, correctedText: String)
 }
 
 class NetworkAppRepository(
     private val api: QingkuiApi,
     private val tokenStore: TokenStore,
+    private val context: Context,
 ) : AppRepository {
     private val gson = Gson()
+    private val draftDao = MistakeDatabase.get(context).drafts()
 
     override suspend fun hasSession(): Boolean = tokenStore.refreshToken() != null
     override suspend fun nickname(): String? = tokenStore.nickname()
@@ -114,6 +144,7 @@ class NetworkAppRepository(
         } catch (_: Exception) {
             // Local sign-out must remain available when the backend is offline.
         } finally {
+            clearLocalMistakes()
             tokenStore.clear()
         }
     }
@@ -229,6 +260,7 @@ class NetworkAppRepository(
     override suspend fun deleteAccount() = apiCall {
         val response = api.deleteAccount()
         if (!response.isSuccessful) throw ApiFailureException(response.code(), "注销账户失败")
+        clearLocalMistakes()
         tokenStore.clear()
     }
 
@@ -331,6 +363,93 @@ class NetworkAppRepository(
         Unit
     }
 
+    override fun observeMistakeDrafts(): Flow<List<MistakeDraftItem>> = draftDao.observeAll().map { drafts ->
+        drafts.map { draft ->
+            MistakeDraftItem(
+                id = draft.id,
+                imagePath = draft.imagePath,
+                subject = draft.subject,
+                questionText = draft.questionText,
+                status = draft.status,
+                errorMessage = draft.errorMessage,
+            )
+        }
+    }
+
+    override suspend fun mistakes(): List<MistakeItem> = apiCall {
+        val response = api.mistakes()
+        val remoteIds = response.mapTo(mutableSetOf()) { it.id }
+        draftDao.all().filter { it.status == "uploaded" && it.remoteId in remoteIds }.forEach { draft ->
+            File(draft.imagePath).delete()
+            draftDao.delete(draft.id)
+        }
+        response.map { mistake ->
+            val task = mistake.ocrTasks.lastOrNull()
+            MistakeItem(
+                id = mistake.id,
+                subject = mistake.subject ?: "待识别",
+                questionText = mistake.correctedText ?: task?.resultText ?: mistake.questionText ?: "图片题目识别中",
+                ocrTaskId = task?.id,
+                ocrStatus = task?.status ?: "manual",
+                confidence = task?.confidence,
+                requiresReview = task?.requiresReview == true,
+                errorCategory = mistake.errorCategory,
+                studyStatus = mistake.studyStatus,
+            )
+        }
+    }
+
+    override suspend fun saveMistakeDraft(
+        imagePath: String,
+        subject: String,
+        questionText: String,
+        studentWork: String,
+        questionGoal: String,
+    ) {
+        val id = UUID.randomUUID().toString()
+        draftDao.upsert(
+            MistakeDraftEntity(
+                id = id,
+                imagePath = imagePath,
+                subject = subject,
+                questionText = questionText,
+                studentWork = studentWork,
+                questionGoal = questionGoal,
+                status = "waiting",
+            ),
+        )
+        val request = OneTimeWorkRequestBuilder<MistakeUploadWorker>()
+            .addTag(MISTAKE_UPLOAD_TAG)
+            .setInputData(Data.Builder().putString(MistakeUploadWorker.KEY_DRAFT_ID, id).build())
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "mistake-upload-$id",
+            ExistingWorkPolicy.KEEP,
+            request,
+        )
+    }
+
+    override suspend fun confirmMistakeOcr(
+        mistakeId: String,
+        taskId: String,
+        correctedText: String,
+    ) = apiCall {
+        api.confirmMistakeOcr(mistakeId, taskId, OcrCorrectionDto(correctedText))
+        Unit
+    }
+
+    private suspend fun clearLocalMistakes() {
+        WorkManager.getInstance(context).cancelAllWorkByTag(MISTAKE_UPLOAD_TAG)
+        draftDao.all().forEach { File(it.imagePath).delete() }
+        draftDao.deleteAll()
+    }
+
+    private companion object {
+        const val MISTAKE_UPLOAD_TAG = "mistake-upload"
+    }
+
     private suspend fun <T> apiCall(block: suspend () -> T): T = try {
         block()
     } catch (error: HttpException) {
@@ -415,7 +534,7 @@ object AppRepositoryProvider {
 
     fun get(context: Context): AppRepository = instance ?: synchronized(this) {
         instance ?: TokenStore(context.applicationContext).let { tokenStore ->
-            NetworkAppRepository(NetworkModule.create(tokenStore), tokenStore).also { instance = it }
+            NetworkAppRepository(NetworkModule.create(tokenStore), tokenStore, context.applicationContext).also { instance = it }
         }
     }
 }

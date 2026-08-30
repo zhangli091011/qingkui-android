@@ -129,6 +129,29 @@ data class CreditLedgerItem(
 )
 
 @Immutable
+data class MistakeDraftItem(
+    val id: String,
+    val imagePath: String,
+    val subject: String,
+    val questionText: String,
+    val status: String,
+    val errorMessage: String?,
+)
+
+@Immutable
+data class MistakeItem(
+    val id: String,
+    val subject: String,
+    val questionText: String,
+    val ocrTaskId: String?,
+    val ocrStatus: String,
+    val confidence: Double?,
+    val requiresReview: Boolean,
+    val errorCategory: String?,
+    val studyStatus: String,
+)
+
+@Immutable
 data class AppUiState(
     val destination: AppDestination = AppDestination.Chat,
     val draft: String = "",
@@ -160,4 +183,9 @@ data class AppUiState(
     val ledger: List<CreditLedgerItem> = emptyList(),
     val selectedNodeDetail: KnowledgeNode? = null,
     val noteDraft: String = "",
+    val mistakeDrafts: List<MistakeDraftItem> = emptyList(),
+    val mistakes: List<MistakeItem> = emptyList(),
+    val mistakeCaptureOpen: Boolean = false,
+    val mistakeLoading: Boolean = false,
+    val learningShowsMistakes: Boolean = false,
 )

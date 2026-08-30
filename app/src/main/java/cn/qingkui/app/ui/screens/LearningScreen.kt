@@ -27,7 +27,17 @@ import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.outlined.AddAPhoto
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,12 +46,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.LearningItem
+import cn.qingkui.app.ui.model.MistakeDraftItem
+import cn.qingkui.app.ui.model.MistakeItem
+import coil.compose.AsyncImage
+import java.io.File
 
 @Composable
 fun LearningScreen(
     compact: Boolean,
     items: List<LearningItem>,
+    mistakeDrafts: List<MistakeDraftItem>,
+    mistakes: List<MistakeItem>,
+    showMistakes: Boolean,
+    mistakeLoading: Boolean,
     onOpenItem: (String) -> Unit,
+    onShowLearning: () -> Unit,
+    onShowMistakes: () -> Unit,
+    onCaptureMistake: () -> Unit,
+    onRefreshMistakes: () -> Unit,
+    onConfirmOcr: (String, String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -54,23 +77,38 @@ fun LearningScreen(
             Spacer(Modifier.height(if (compact) 20.dp else 32.dp))
             Text("今天继续", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(
-                "回到具体知识点，保持学习连续",
+                if (showMistakes) "校对识别结果，按错因持续复习" else "回到具体知识点，保持学习连续",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onShowLearning) { Text("学习记录", color = if (!showMistakes) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
+                TextButton(onClick = onShowMistakes) { Text("错题本", color = if (showMistakes) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
             Spacer(Modifier.height(24.dp))
-            LearningFilters()
-            Spacer(Modifier.height(20.dp))
-            Divider(color = MaterialTheme.colorScheme.outline)
-            if (items.isEmpty()) {
-                Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
-                    Text("还没有学习记录", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+            if (showMistakes) {
+                MistakeBookContent(
+                    drafts = mistakeDrafts,
+                    mistakes = mistakes,
+                    loading = mistakeLoading,
+                    onCapture = onCaptureMistake,
+                    onRefresh = onRefreshMistakes,
+                    onConfirm = onConfirmOcr,
+                )
             } else {
-                LazyColumn {
-                    items(items, key = { it.nodeId }) { item ->
-                        KnowledgeStateRow(item = item, onClick = { onOpenItem(item.nodeId) })
-                        Divider(color = MaterialTheme.colorScheme.outline)
+                LearningFilters()
+                Spacer(Modifier.height(20.dp))
+                Divider(color = MaterialTheme.colorScheme.outline)
+                if (items.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
+                        Text("还没有学习记录", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    LazyColumn {
+                        items(items, key = { it.nodeId }) { item ->
+                            KnowledgeStateRow(item = item, onClick = { onOpenItem(item.nodeId) })
+                            Divider(color = MaterialTheme.colorScheme.outline)
+                        }
                     }
                 }
             }
@@ -141,4 +179,106 @@ private fun statusColor(status: KnowledgeStatus): Color = when (status) {
     KnowledgeStatus.Unstable -> MaterialTheme.colorScheme.secondary
     KnowledgeStatus.ErrorProne -> MaterialTheme.colorScheme.error
     KnowledgeStatus.ToExplore -> MaterialTheme.colorScheme.secondary
+}
+
+@Composable
+private fun MistakeBookContent(
+    drafts: List<MistakeDraftItem>,
+    mistakes: List<MistakeItem>,
+    loading: Boolean,
+    onCapture: () -> Unit,
+    onRefresh: () -> Unit,
+    onConfirm: (String, String, String) -> Unit,
+) {
+    var editing by remember { mutableStateOf<MistakeItem?>(null) }
+    var correction by remember { mutableStateOf("") }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = onCapture) {
+            Icon(Icons.Outlined.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("录入错题")
+        }
+        TextButton(onClick = onRefresh, enabled = !loading) {
+            Icon(Icons.Outlined.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(if (loading) "刷新中" else "刷新状态")
+        }
+    }
+    Spacer(Modifier.height(16.dp))
+    Divider(color = MaterialTheme.colorScheme.outline)
+    val pendingDrafts = drafts.filter { it.status != "uploaded" }
+    if (pendingDrafts.isEmpty() && mistakes.isEmpty()) {
+        Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
+            Text("还没有错题", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    } else {
+        LazyColumn {
+            items(pendingDrafts, key = { "draft-${it.id}" }) { draft ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    AsyncImage(model = File(draft.imagePath), contentDescription = null, modifier = Modifier.size(72.dp).background(MaterialTheme.colorScheme.surfaceVariant))
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(draft.questionText.ifBlank { "图片题目待识别" }, style = MaterialTheme.typography.bodyLarge, maxLines = 2)
+                        Text(draftStatusLabel(draft.status), style = MaterialTheme.typography.bodySmall, color = if (draft.status == "failed") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (!draft.errorMessage.isNullOrBlank()) Text(draft.errorMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, maxLines = 2)
+                    }
+                }
+                Divider(color = MaterialTheme.colorScheme.outline)
+            }
+            items(mistakes, key = { "remote-${it.id}" }) { item ->
+                Column(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(item.subject, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                        Text(ocrStatusLabel(item.ocrStatus), style = MaterialTheme.typography.bodySmall, color = if (item.ocrStatus == "failed") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(item.questionText, style = MaterialTheme.typography.bodyLarge, maxLines = 5)
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (item.confidence != null) Text("置信度 ${(item.confidence * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (item.requiresReview && item.ocrTaskId != null && item.ocrStatus == "succeeded") {
+                            TextButton(onClick = { editing = item; correction = item.questionText }) { Text("校对确认") }
+                        }
+                    }
+                }
+                Divider(color = MaterialTheme.colorScheme.outline)
+            }
+        }
+    }
+    val current = editing
+    if (current != null && current.ocrTaskId != null) {
+        AlertDialog(
+            onDismissRequest = { editing = null },
+            title = { Text("校对 OCR 结果") },
+            text = {
+                OutlinedTextField(
+                    value = correction,
+                    onValueChange = { correction = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 6,
+                    label = { Text("确认后的题目文字") },
+                )
+            },
+            confirmButton = {
+                Button(onClick = { onConfirm(current.id, current.ocrTaskId, correction); editing = null }, enabled = correction.isNotBlank()) { Text("确认") }
+            },
+            dismissButton = { TextButton(onClick = { editing = null }) { Text("取消") } },
+        )
+    }
+}
+
+private fun draftStatusLabel(status: String): String = when (status) {
+    "waiting" -> "等待网络上传"
+    "uploading" -> "正在上传"
+    "failed" -> "上传失败"
+    else -> "本地草稿"
+}
+
+private fun ocrStatusLabel(status: String): String = when (status) {
+    "queued" -> "排队识别"
+    "recognizing" -> "正在识别"
+    "succeeded" -> "识别完成"
+    "failed" -> "识别失败"
+    "cancelled" -> "已取消"
+    else -> "手动录入"
 }
