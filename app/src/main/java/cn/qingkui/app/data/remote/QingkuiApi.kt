@@ -27,6 +27,7 @@ import cn.qingkui.app.data.remote.dto.RegisterRequest
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
@@ -101,11 +102,19 @@ interface QingkuiApi {
     suspend fun deleteSession(@Path("id") sessionId: String): retrofit2.Response<Unit>
 
     @POST("qa/sessions/{id}/messages")
-    suspend fun sendMessage(@Path("id") sessionId: String, @Body body: MessageCreate): QaResultDto
+    suspend fun sendMessage(
+        @Path("id") sessionId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: MessageCreate,
+    ): QaResultDto
 
     @Streaming
     @POST("qa/sessions/{id}/messages/stream")
-    suspend fun streamMessage(@Path("id") sessionId: String, @Body body: MessageCreate): Response<ResponseBody>
+    suspend fun streamMessage(
+        @Path("id") sessionId: String,
+        @Header("Idempotency-Key") idempotencyKey: String,
+        @Body body: MessageCreate,
+    ): Response<ResponseBody>
 
     @POST("learning/events")
     suspend fun createLearningEvent(@Body body: LearningEventCreate): LearningEventDto

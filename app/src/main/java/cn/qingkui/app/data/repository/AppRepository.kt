@@ -321,10 +321,11 @@ class NetworkAppRepository(
     ): QaAnswer = apiCall {
         val activeSessionId = sessionId ?: api.createSession(ConversationCreate(mode = mode.apiValue, knowledgeNodeId = nodeId)).id
         val body = MessageCreate(question, helpLevel.apiValue)
-        val streamResponse = api.streamMessage(activeSessionId, body)
+        val idempotencyKey = "android-${UUID.randomUUID()}"
+        val streamResponse = api.streamMessage(activeSessionId, idempotencyKey, body)
         val result = if (streamResponse.code() == 404) {
             streamResponse.errorBody()?.close()
-            api.sendMessage(activeSessionId, body).also { fallback ->
+            api.sendMessage(activeSessionId, idempotencyKey, body).also { fallback ->
                 fallback.assistantMessage.content.chunked(3).forEach { chunk ->
                     onDelta(chunk)
                     delay(18)
