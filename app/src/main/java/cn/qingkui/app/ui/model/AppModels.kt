@@ -259,6 +259,7 @@ data class AppUiState(
     val username: String = "",
     val password: String = "",
     val nickname: String = "",
+    val email: String = "",
     val currentUserName: String = "青葵同学",
     val authLoading: Boolean = false,
     val contentLoading: Boolean = false,

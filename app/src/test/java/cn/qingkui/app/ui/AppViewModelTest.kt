@@ -381,7 +381,9 @@ private class FakeRepository(
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null
     override suspend fun login(username: String, password: String) = "测试同学"
-    override suspend fun register(username: String, password: String, nickname: String) = nickname
+    override suspend fun register(username: String, password: String, nickname: String, email: String) = nickname
+    override suspend fun requestPasswordReset(email: String) = Unit
+    override suspend fun confirmPasswordReset(token: String, newPassword: String) = Unit
     override suspend fun logout() = Unit
     override suspend fun credits() = answerBalance
     override suspend fun creditLedger(): List<CreditLedgerItem> = emptyList()

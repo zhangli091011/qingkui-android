@@ -72,6 +72,7 @@ class AppViewModel(
     fun updateUsername(value: String) = _uiState.update { it.copy(username = value, errorMessage = null) }
     fun updatePassword(value: String) = _uiState.update { it.copy(password = value, errorMessage = null) }
     fun updateNickname(value: String) = _uiState.update { it.copy(nickname = value, errorMessage = null) }
+    fun updateEmail(value: String) = _uiState.update { it.copy(email = value, errorMessage = null) }
 
     fun submitAuth() {
         val state = _uiState.value
@@ -85,7 +86,7 @@ class AppViewModel(
                 val name = if (state.authMode == AuthMode.Login) {
                     repository.login(state.username, state.password)
                 } else {
-                    repository.register(state.username, state.password, state.nickname)
+                    repository.register(state.username, state.password, state.nickname, state.email)
                 }
                 _uiState.update {
                     it.copy(
@@ -93,6 +94,7 @@ class AppViewModel(
                         authScreenOpen = false,
                         authLoading = false,
                         password = "",
+                        email = "",
                         currentUserName = name,
                         pendingSendAfterAuth = false,
                     )
@@ -677,6 +679,22 @@ class AppViewModel(
     fun changePassword(current: String, next: String) {
         viewModelScope.launch {
             try { repository.changePassword(current, next); repository.logout(); _uiState.value = AppUiState(authChecking = false, destination = AppDestination.Account, errorMessage = "密码已修改，请重新登录") }
+            catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun requestPasswordReset(email: String) {
+        if (!email.contains('@')) { _uiState.update { it.copy(errorMessage = "请输入有效邮箱") }; return }
+        viewModelScope.launch {
+            try { repository.requestPasswordReset(email); _uiState.update { it.copy(errorMessage = "如果邮箱已绑定，重置邮件将很快发送") } }
+            catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun confirmPasswordReset(token: String, newPassword: String) {
+        if (token.length < 32 || newPassword.length < 8) { _uiState.update { it.copy(errorMessage = "令牌或新密码格式不正确") }; return }
+        viewModelScope.launch {
+            try { repository.confirmPasswordReset(token, newPassword); _uiState.update { it.copy(errorMessage = "密码已重置，请登录") } }
             catch (error: Exception) { handleApiError(error) { it } }
         }
     }

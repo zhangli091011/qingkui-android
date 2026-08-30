@@ -146,6 +146,9 @@ data class ChangePasswordRequest(
     @SerializedName("new_password") val newPassword: String,
 )
 
+data class PasswordResetRequest(val email: String)
+data class PasswordResetConfirm(val token: String, @SerializedName("new_password") val newPassword: String)
+
 data class QaResultDto(
     @SerializedName("conversation_id") val conversationId: String,
     @SerializedName("assistant_message") val assistantMessage: MessageDto,

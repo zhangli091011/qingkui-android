@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +23,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -37,15 +42,24 @@ fun AuthScreen(
     username: String,
     password: String,
     nickname: String,
+    email: String,
     loading: Boolean,
     errorMessage: String?,
     onModeChange: (AuthMode) -> Unit,
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onNicknameChange: (String) -> Unit,
+    onEmailChange: (String) -> Unit,
+    onRequestPasswordReset: (String) -> Unit,
+    onConfirmPasswordReset: (String, String) -> Unit,
     onSubmit: () -> Unit,
     onBack: () -> Unit,
 ) {
+    var resetOpen by remember { mutableStateOf(false) }
+    var resetRequested by remember { mutableStateOf(false) }
+    var resetEmail by remember { mutableStateOf("") }
+    var resetToken by remember { mutableStateOf("") }
+    var resetPassword by remember { mutableStateOf("") }
     Box(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp),
         contentAlignment = Alignment.Center,
@@ -77,6 +91,12 @@ fun AuthScreen(
             if (mode == AuthMode.Register) {
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(nickname, onNicknameChange, Modifier.fillMaxWidth(), label = { Text("昵称（可选）") }, singleLine = true, enabled = !loading)
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    email, onEmailChange, Modifier.fillMaxWidth(), label = { Text("邮箱（用于找回密码）") },
+                    singleLine = true, enabled = !loading,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                )
             }
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
@@ -104,10 +124,40 @@ fun AuthScreen(
                 if (loading) CircularProgressIndicator(modifier = Modifier.height(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                 else Text(if (mode == AuthMode.Login) "登录" else "创建账户")
             }
+            if (mode == AuthMode.Login) {
+                TextButton(onClick = { resetOpen = true }) { Text("忘记密码") }
+            }
             Spacer(Modifier.height(8.dp))
             TextButton(onClick = onBack, enabled = !loading) {
                 Text("暂不登录，返回首页")
             }
         }
+    }
+    if (resetOpen) {
+        AlertDialog(
+            onDismissRequest = { resetOpen = false },
+            title = { Text("找回密码") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (!resetRequested) {
+                        OutlinedTextField(resetEmail, { resetEmail = it }, label = { Text("绑定邮箱") }, singleLine = true)
+                    } else {
+                        Text("请查看邮件并输入一次性令牌。", style = MaterialTheme.typography.bodySmall)
+                        OutlinedTextField(resetToken, { resetToken = it }, label = { Text("重置令牌") }, singleLine = true)
+                        OutlinedTextField(
+                            resetPassword, { resetPassword = it }, label = { Text("新密码") }, singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (!resetRequested) { onRequestPasswordReset(resetEmail); resetRequested = true }
+                    else { onConfirmPasswordReset(resetToken, resetPassword); resetOpen = false }
+                }) { Text(if (resetRequested) "重置密码" else "发送邮件") }
+            },
+            dismissButton = { TextButton(onClick = { resetOpen = false }) { Text("取消") } },
+        )
     }
 }

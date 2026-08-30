@@ -67,6 +67,12 @@ interface QingkuiApi {
     @POST("auth/change-password")
     suspend fun changePassword(@Body body: ChangePasswordRequest)
 
+    @POST("auth/password-reset/request")
+    suspend fun requestPasswordReset(@Body body: cn.qingkui.app.data.remote.dto.PasswordResetRequest)
+
+    @POST("auth/password-reset/confirm")
+    suspend fun confirmPasswordReset(@Body body: cn.qingkui.app.data.remote.dto.PasswordResetConfirm)
+
     @GET("auth/sessions")
     suspend fun deviceSessions(): List<DeviceSessionDto>
 

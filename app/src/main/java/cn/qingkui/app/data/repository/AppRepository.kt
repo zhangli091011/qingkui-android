@@ -31,6 +31,8 @@ import cn.qingkui.app.data.remote.dto.NeighborNodeDto
 import cn.qingkui.app.data.remote.dto.OcrCorrectionDto
 import cn.qingkui.app.data.remote.dto.PracticeSubmitDto
 import cn.qingkui.app.data.remote.dto.RegisterRequest
+import cn.qingkui.app.data.remote.dto.PasswordResetRequest
+import cn.qingkui.app.data.remote.dto.PasswordResetConfirm
 import cn.qingkui.app.data.remote.dto.QaIntentRequest
 import cn.qingkui.app.data.work.MistakeUploadWorker
 import cn.qingkui.app.ui.model.ChatMessage
@@ -98,7 +100,9 @@ interface AppRepository {
     suspend fun hasSession(): Boolean
     suspend fun nickname(): String?
     suspend fun login(username: String, password: String): String
-    suspend fun register(username: String, password: String, nickname: String): String
+    suspend fun register(username: String, password: String, nickname: String, email: String): String
+    suspend fun requestPasswordReset(email: String)
+    suspend fun confirmPasswordReset(token: String, newPassword: String)
     suspend fun logout()
     suspend fun credits(): Int
     suspend fun creditLedger(): List<CreditLedgerItem>
@@ -166,10 +170,18 @@ class NetworkAppRepository(
         api.login(LoginRequest(username.trim(), password)).also { tokenStore.save(it) }.user.nickname
     }
 
-    override suspend fun register(username: String, password: String, nickname: String): String = apiCall {
-        api.register(RegisterRequest(username.trim(), password, nickname.trim().ifBlank { null }))
+    override suspend fun register(username: String, password: String, nickname: String, email: String): String = apiCall {
+        api.register(RegisterRequest(username.trim(), password, nickname.trim().ifBlank { null }, email.trim().ifBlank { null }))
             .also { tokenStore.save(it) }
             .user.nickname
+    }
+
+    override suspend fun requestPasswordReset(email: String) = apiCall {
+        api.requestPasswordReset(PasswordResetRequest(email.trim()))
+    }
+
+    override suspend fun confirmPasswordReset(token: String, newPassword: String) = apiCall {
+        api.confirmPasswordReset(PasswordResetConfirm(token.trim(), newPassword))
     }
 
     override suspend fun logout() {
