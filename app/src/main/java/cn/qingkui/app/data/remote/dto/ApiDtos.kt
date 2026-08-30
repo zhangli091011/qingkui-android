@@ -19,6 +19,15 @@ data class RegisterRequest(
 data class RefreshRequest(@SerializedName("refresh_token") val refreshToken: String)
 data class LogoutRequest(@SerializedName("refresh_token") val refreshToken: String)
 
+data class DeviceSessionDto(
+    val id: String,
+    @SerializedName("device_name") val deviceName: String?,
+    @SerializedName("expires_at") val expiresAt: String,
+    @SerializedName("revoked_at") val revokedAt: String?,
+    @SerializedName("created_at") val createdAt: String,
+    val active: Boolean,
+)
+
 data class UserDto(
     val id: String,
     val username: String,
@@ -151,7 +160,17 @@ data class FeedbackCreate(
     @SerializedName("message_id") val messageId: String?,
 )
 
-data class FeedbackDto(val id: String)
+data class FeedbackDto(
+    val id: String,
+    val category: String = "other",
+    val content: String = "",
+    @SerializedName("node_id") val nodeId: String? = null,
+    @SerializedName("message_id") val messageId: String? = null,
+    val status: String = "pending",
+    @SerializedName("review_note") val reviewNote: String? = null,
+    @SerializedName("reviewed_at") val reviewedAt: String? = null,
+    @SerializedName("created_at") val createdAt: String = "",
+)
 
 data class LearningSummaryItemDto(
     val id: String,

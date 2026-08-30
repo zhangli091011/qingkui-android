@@ -200,6 +200,11 @@ fun QingkuiApp() {
                         onChangePassword = viewModel::changePassword,
                         onDeleteAccount = viewModel::deleteAccount,
                         ledger = uiState.ledger,
+                        deviceSessions = uiState.deviceSessions,
+                        feedbackItems = uiState.feedbackItems,
+                        onRefreshAccount = viewModel::refreshAccount,
+                        onRevokeDevice = viewModel::revokeDeviceSession,
+                        onSubmitFeedback = viewModel::submitFeedback,
                     )
                 }
             }

@@ -32,6 +32,8 @@ import cn.qingkui.app.data.work.MistakeUploadWorker
 import cn.qingkui.app.ui.model.ChatMessage
 import cn.qingkui.app.ui.model.ConversationSummary
 import cn.qingkui.app.ui.model.CreditLedgerItem
+import cn.qingkui.app.ui.model.DeviceSessionItem
+import cn.qingkui.app.ui.model.FeedbackItem
 import cn.qingkui.app.ui.model.KnowledgeKind
 import cn.qingkui.app.ui.model.KnowledgeNode
 import cn.qingkui.app.ui.model.KnowledgeRelation
@@ -84,6 +86,10 @@ interface AppRepository {
     suspend fun logout()
     suspend fun credits(): Int
     suspend fun creditLedger(): List<CreditLedgerItem>
+    suspend fun deviceSessions(): List<DeviceSessionItem>
+    suspend fun revokeDeviceSession(sessionId: String)
+    suspend fun feedback(): List<FeedbackItem>
+    suspend fun submitFeedback(category: String, content: String)
     suspend fun graph(centerId: String = "quadratic_function"): GraphData
     suspend fun nodeDetail(nodeId: String): KnowledgeNode
     suspend fun search(query: String): GraphData
@@ -155,6 +161,40 @@ class NetworkAppRepository(
         api.creditLedger().map { item ->
             CreditLedgerItem(item.id, item.amount, item.balanceAfter, item.entryType, item.createdAt)
         }
+    }
+
+    override suspend fun deviceSessions(): List<DeviceSessionItem> = apiCall {
+        api.deviceSessions().map { item ->
+            DeviceSessionItem(
+                id = item.id,
+                deviceName = item.deviceName?.ifBlank { null } ?: "未命名设备",
+                expiresAt = item.expiresAt.replace('T', ' ').take(16),
+                active = item.active,
+            )
+        }
+    }
+
+    override suspend fun revokeDeviceSession(sessionId: String) = apiCall {
+        val response = api.revokeDeviceSession(sessionId)
+        if (!response.isSuccessful) throw ApiFailureException(response.code(), "撤销设备会话失败")
+    }
+
+    override suspend fun feedback(): List<FeedbackItem> = apiCall {
+        api.feedback().map { item ->
+            FeedbackItem(
+                id = item.id,
+                category = item.category,
+                content = item.content,
+                status = item.status,
+                reviewNote = item.reviewNote,
+                createdAt = item.createdAt.replace('T', ' ').take(16),
+            )
+        }
+    }
+
+    override suspend fun submitFeedback(category: String, content: String) = apiCall {
+        api.submitFeedback(FeedbackCreate(category, content.trim(), null))
+        Unit
     }
 
     override suspend fun graph(centerId: String): GraphData = apiCall {

@@ -6,6 +6,7 @@ import cn.qingkui.app.data.remote.dto.ConversationDto
 import cn.qingkui.app.data.remote.dto.ChangePasswordRequest
 import cn.qingkui.app.data.remote.dto.CreditLedgerDto
 import cn.qingkui.app.data.remote.dto.CreditDto
+import cn.qingkui.app.data.remote.dto.DeviceSessionDto
 import cn.qingkui.app.data.remote.dto.FeedbackCreate
 import cn.qingkui.app.data.remote.dto.FeedbackDto
 import cn.qingkui.app.data.remote.dto.KnowledgeNodeDto
@@ -56,6 +57,12 @@ interface QingkuiApi {
 
     @POST("auth/change-password")
     suspend fun changePassword(@Body body: ChangePasswordRequest)
+
+    @GET("auth/sessions")
+    suspend fun deviceSessions(): List<DeviceSessionDto>
+
+    @DELETE("auth/sessions/{id}")
+    suspend fun revokeDeviceSession(@Path("id") sessionId: String): retrofit2.Response<Unit>
 
     @DELETE("auth/me")
     suspend fun deleteAccount(): retrofit2.Response<Unit>
@@ -108,6 +115,9 @@ interface QingkuiApi {
 
     @POST("feedback")
     suspend fun submitFeedback(@Body body: FeedbackCreate): FeedbackDto
+
+    @GET("feedback")
+    suspend fun feedback(@Query("limit") limit: Int = 50): List<FeedbackDto>
 
     @POST("mistakes")
     suspend fun createMistake(@Body body: MistakeCreateDto): MistakeDto

@@ -6,6 +6,8 @@ import cn.qingkui.app.data.repository.QaAnswer
 import cn.qingkui.app.ui.model.AppDestination
 import cn.qingkui.app.ui.model.ChatMessage
 import cn.qingkui.app.ui.model.CreditLedgerItem
+import cn.qingkui.app.ui.model.DeviceSessionItem
+import cn.qingkui.app.ui.model.FeedbackItem
 import cn.qingkui.app.ui.model.LearningItem
 import cn.qingkui.app.ui.model.MessageAuthor
 import cn.qingkui.app.ui.model.MistakeDraftItem
@@ -115,6 +117,43 @@ class AppViewModelTest {
             Dispatchers.resetMain()
         }
     }
+
+    @Test
+    fun accountDeviceSessionCanBeRevoked() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository()
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+
+            assertEquals(1, viewModel.uiState.value.deviceSessions.size)
+            viewModel.revokeDeviceSession("device-session-1")
+            advanceUntilIdle()
+
+            assertEquals(listOf("device-session-1"), repository.revokedSessions)
+            assertTrue(viewModel.uiState.value.deviceSessions.isEmpty())
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun accountFeedbackIsSubmittedAndRefreshed() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository()
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+
+            viewModel.submitFeedback("product_issue", "横屏按钮被遮挡")
+            advanceUntilIdle()
+
+            assertEquals(listOf("product_issue" to "横屏按钮被遮挡"), repository.feedbackSubmissions)
+            assertEquals("pending", viewModel.uiState.value.feedbackItems.first().status)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
 }
 
 private class FakeRepository(
@@ -122,6 +161,8 @@ private class FakeRepository(
     private val authenticated: Boolean = true,
 ) : AppRepository {
     var questionsSent = 0
+    val revokedSessions = mutableListOf<String>()
+    val feedbackSubmissions = mutableListOf<Pair<String, String>>()
 
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null
@@ -130,6 +171,18 @@ private class FakeRepository(
     override suspend fun logout() = Unit
     override suspend fun credits() = answerBalance
     override suspend fun creditLedger(): List<CreditLedgerItem> = emptyList()
+    override suspend fun deviceSessions(): List<DeviceSessionItem> = listOf(
+        DeviceSessionItem("device-session-1", "测试平板", "2026-09-30 12:00", true),
+    )
+    override suspend fun revokeDeviceSession(sessionId: String) {
+        revokedSessions += sessionId
+    }
+    override suspend fun feedback(): List<FeedbackItem> = listOf(
+        FeedbackItem("feedback-1", "product_issue", "横屏按钮被遮挡", "pending", null, "2026-08-30 12:00"),
+    )
+    override suspend fun submitFeedback(category: String, content: String) {
+        feedbackSubmissions += category to content
+    }
     override suspend fun graph(centerId: String) = GraphData(emptyList(), emptyList(), null)
     override suspend fun nodeDetail(nodeId: String) = throw UnsupportedOperationException()
     override suspend fun search(query: String) = GraphData(emptyList(), emptyList(), null)

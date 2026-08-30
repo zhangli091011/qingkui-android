@@ -116,9 +116,36 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
                     contentLoading = false,
                 )
             }
+            refreshAccountData()
         } catch (error: Exception) {
             handleApiError(error) { it.copy(contentLoading = false) }
         }
+    }
+
+    fun refreshAccount() {
+        if (!_uiState.value.authenticated) return
+        viewModelScope.launch { refreshAccountData() }
+    }
+
+    private suspend fun refreshAccountData() {
+        val (deviceSessions, feedbackItems) = coroutineScope {
+            val devicesTask = async {
+                try {
+                    repository.deviceSessions()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+            val feedbackTask = async {
+                try {
+                    repository.feedback()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+            devicesTask.await() to feedbackTask.await()
+        }
+        _uiState.update { it.copy(deviceSessions = deviceSessions, feedbackItems = feedbackItems) }
     }
 
     fun selectDestination(destination: AppDestination) {
@@ -346,6 +373,35 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
         viewModelScope.launch {
             try { repository.deleteAccount(); _uiState.value = AppUiState(authChecking = false, destination = AppDestination.Account, errorMessage = "账户已注销") }
             catch (error: Exception) { handleApiError(error) { it } }
+        }
+    }
+
+    fun revokeDeviceSession(sessionId: String) {
+        viewModelScope.launch {
+            try {
+                repository.revokeDeviceSession(sessionId)
+                _uiState.update { state ->
+                    state.copy(deviceSessions = state.deviceSessions.filterNot { it.id == sessionId })
+                }
+            } catch (error: Exception) {
+                handleApiError(error) { it }
+            }
+        }
+    }
+
+    fun submitFeedback(category: String, content: String) {
+        if (content.trim().length < 2) {
+            _uiState.update { it.copy(errorMessage = "请填写反馈内容") }
+            return
+        }
+        viewModelScope.launch {
+            try {
+                repository.submitFeedback(category, content)
+                refreshAccountData()
+                _uiState.update { it.copy(errorMessage = "反馈已提交") }
+            } catch (error: Exception) {
+                handleApiError(error) { it }
+            }
         }
     }
 

@@ -129,6 +129,24 @@ data class CreditLedgerItem(
 )
 
 @Immutable
+data class DeviceSessionItem(
+    val id: String,
+    val deviceName: String,
+    val expiresAt: String,
+    val active: Boolean,
+)
+
+@Immutable
+data class FeedbackItem(
+    val id: String,
+    val category: String,
+    val content: String,
+    val status: String,
+    val reviewNote: String?,
+    val createdAt: String,
+)
+
+@Immutable
 data class MistakeDraftItem(
     val id: String,
     val imagePath: String,
@@ -181,6 +199,8 @@ data class AppUiState(
     val learningItems: List<LearningItem> = emptyList(),
     val sessions: List<ConversationSummary> = emptyList(),
     val ledger: List<CreditLedgerItem> = emptyList(),
+    val deviceSessions: List<DeviceSessionItem> = emptyList(),
+    val feedbackItems: List<FeedbackItem> = emptyList(),
     val selectedNodeDetail: KnowledgeNode? = null,
     val noteDraft: String = "",
     val mistakeDrafts: List<MistakeDraftItem> = emptyList(),
