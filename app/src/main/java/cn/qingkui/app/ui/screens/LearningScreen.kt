@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -241,6 +243,14 @@ private fun MistakeBookContent(
     var answering by remember { mutableStateOf<Pair<MistakeItem, MistakePracticeItem>?>(null) }
     var practiceAnswer by remember { mutableStateOf("") }
     var showPracticeHint by remember { mutableStateOf(false) }
+    var focusedMistakeId by remember { mutableStateOf<String?>(null) }
+    val pendingDrafts = drafts.filter { it.status != "uploaded" }
+    val mistakeListState = rememberLazyListState()
+    LaunchedEffect(focusedMistakeId) {
+        val id = focusedMistakeId ?: return@LaunchedEffect
+        val index = mistakes.indexOfFirst { it.id == id }
+        if (index >= 0) mistakeListState.animateScrollToItem(pendingDrafts.size + index)
+    }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(onClick = onCapture) {
             Icon(Icons.Outlined.AddAPhoto, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -264,6 +274,21 @@ private fun MistakeBookContent(
                 "新增 ${report.newMistakes} 题 · 待复习 ${report.dueReviewCount} 题 · 主要错因 ${errorCategoryLabel(report.topErrorCategory)}",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            if (report.dueReviews.isNotEmpty()) {
+                Text("待复习入口", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                report.dueReviews.take(5).forEach { link ->
+                    TextButton(
+                        onClick = { focusedMistakeId = link.mistakeId },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            "${link.title} · ${reviewStageLabel(link.reviewStage)}",
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
             Text(
                 "练习完成 ${(report.practiceCompletionRate * 100).toInt()}% · 权威正确 ${(report.authoritativeAccuracy * 100).toInt()}% · 二次正确 ${(report.secondAttemptAccuracy * 100).toInt()}% · 7日回访 ${(report.sevenDayFollowupRate * 100).toInt()}%",
                 style = MaterialTheme.typography.bodySmall,
@@ -273,13 +298,12 @@ private fun MistakeBookContent(
         Spacer(Modifier.height(16.dp))
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-    val pendingDrafts = drafts.filter { it.status != "uploaded" }
     if (pendingDrafts.isEmpty() && mistakes.isEmpty()) {
         Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
             Text("还没有错题", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else {
-        LazyColumn {
+        LazyColumn(state = mistakeListState) {
             items(pendingDrafts, key = { "draft-${it.id}" }) { draft ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (draft.imagePath.isNotBlank()) {
@@ -305,7 +329,15 @@ private fun MistakeBookContent(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             }
             items(mistakes, key = { "remote-${it.id}" }) { item ->
-                Column(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            if (item.id == focusedMistakeId) MaterialTheme.colorScheme.primaryContainer.copy(alpha = .45f)
+                            else Color.Transparent,
+                        )
+                        .padding(vertical = 16.dp),
+                ) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(item.subject, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                         Row(verticalAlignment = Alignment.CenterVertically) {

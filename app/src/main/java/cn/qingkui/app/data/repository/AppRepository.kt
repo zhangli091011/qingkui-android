@@ -679,6 +679,16 @@ class NetworkAppRepository(
             authoritativeAccuracy = report.authoritativeAccuracy,
             secondAttemptAccuracy = report.secondAttemptAccuracy,
             sevenDayFollowupRate = report.sevenDayFollowupRate,
+            dueReviews = report.dueReviews.map {
+                cn.qingkui.app.ui.model.WeeklyMistakeLinkItem(
+                    mistakeId = it.mistakeId,
+                    practiceRoundId = it.practiceRoundId,
+                    knowledgeNodeId = it.knowledgeNodeId,
+                    title = it.title,
+                    reviewStage = it.reviewStage,
+                    nextReviewAt = it.nextReviewAt,
+                )
+            },
         )
     }
 

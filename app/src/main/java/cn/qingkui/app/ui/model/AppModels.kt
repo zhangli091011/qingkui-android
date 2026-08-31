@@ -302,6 +302,16 @@ data class MistakePracticeItem(
 )
 
 @Immutable
+data class WeeklyMistakeLinkItem(
+    val mistakeId: String,
+    val practiceRoundId: String?,
+    val knowledgeNodeId: String?,
+    val title: String,
+    val reviewStage: String,
+    val nextReviewAt: String?,
+)
+
+@Immutable
 data class MistakeWeeklyReview(
     val weekStart: String,
     val weekEnd: String,
@@ -312,6 +322,7 @@ data class MistakeWeeklyReview(
     val authoritativeAccuracy: Double,
     val secondAttemptAccuracy: Double,
     val sevenDayFollowupRate: Double,
+    val dueReviews: List<WeeklyMistakeLinkItem> = emptyList(),
 )
 
 @Immutable

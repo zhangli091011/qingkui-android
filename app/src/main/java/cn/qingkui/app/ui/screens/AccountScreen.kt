@@ -105,6 +105,7 @@ fun AccountScreen(
     var privacyDialog by remember { mutableStateOf(false) }
     var minorDialog by remember { mutableStateOf(false) }
     var communityDialog by remember { mutableStateOf(false) }
+    var ledgerDialog by remember { mutableStateOf(false) }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -163,7 +164,14 @@ fun AccountScreen(
                         fontWeight = FontWeight.Bold,
                     )
                 }
-                TextButton(onClick = { }) {
+                TextButton(onClick = {
+                    if (authenticated) {
+                        onRefreshAccount()
+                        ledgerDialog = true
+                    } else {
+                        onLogin()
+                    }
+                }) {
                     Text(
                     if (authenticated) "查看流水" else "登录后查看",
                     style = MaterialTheme.typography.labelLarge,
@@ -222,6 +230,46 @@ fun AccountScreen(
             },
             confirmButton = { TextButton(onClick = { onChangePassword(currentPassword, newPassword); passwordDialog = false }) { Text("确认") } },
             dismissButton = { TextButton(onClick = { passwordDialog = false }) { Text("取消") } },
+        )
+    }
+    if (ledgerDialog) {
+        AlertDialog(
+            onDismissRequest = { ledgerDialog = false },
+            title = { Text("额度流水") },
+            text = {
+                Column(
+                    Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (ledger.isEmpty()) {
+                        Text("暂无额度流水", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        ledger.forEach { item ->
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(item.entryType, style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        item.createdAt,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Text(
+                                    "${if (item.amount >= 0) "+" else ""}${item.amount}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = if (item.amount >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                )
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { ledgerDialog = false }) { Text("完成") } },
         )
     }
     if (deleteDialog) {

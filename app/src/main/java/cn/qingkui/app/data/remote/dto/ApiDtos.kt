@@ -444,8 +444,10 @@ data class MistakeDto(
 data class WeeklyMistakeLinkDto(
     @SerializedName("mistake_id") val mistakeId: String,
     @SerializedName("practice_round_id") val practiceRoundId: String? = null,
+    @SerializedName("knowledge_node_id") val knowledgeNodeId: String? = null,
     val title: String,
     @SerializedName("review_stage") val reviewStage: String,
+    @SerializedName("next_review_at") val nextReviewAt: String? = null,
 )
 
 data class MistakeWeeklyReviewDto(
