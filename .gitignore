@@ -18,6 +18,7 @@ captures/
 
 # Signing material and local secrets
 *.jks
+release-evidence/
 *.keystore
 keystore.properties
 .env

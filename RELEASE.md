@@ -36,6 +36,20 @@ Get-FileHash -Algorithm SHA256 $apk
 
 发布记录必须包含 Git 提交、环境、`versionCode`、`versionName`、证书 SHA-256、APK SHA-256、向量索引 SHA-256 和 API 回滚镜像。Debug APK 不得进入学生 MDM 应用目录。
 
+使用脚本从 Gradle 元数据和已签名 APK 生成不可误认成正式批准的草稿清单：
+
+```powershell
+.\scripts\New-ReleaseManifest.ps1 `
+  -Apk app\build\outputs\apk\release\app-release.apk `
+  -Environment pilot `
+  -BackendCommit <40位提交哈希> `
+  -VectorIndexSha256 <64位索引哈希> `
+  -ApiRollbackImage <上一批准镜像摘要> `
+  -Output release-evidence\android-release-manifest.json
+```
+
+脚本会调用 `apksigner verify`，读取真实 `versionCode/versionName`，计算证书和 APK SHA-256。输出始终为 `status=draft`；发布负责人独立核验后再填写 `status=approved`、`approved_by` 和 `approved_at`，并交由后端统一发布就绪报告校验。
+
 ## 回滚
 
 Android 不允许直接安装较低 `versionCode`。紧急回滚包应使用上一批准代码和同一签名证书，但分配更高的 `versionCode`，先进入内部设备组验证，再分阶段推送试点组。
