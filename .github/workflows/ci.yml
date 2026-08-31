@@ -23,6 +23,8 @@ jobs:
         run: chmod +x gradlew
       - name: Unit tests
         run: ./gradlew :app:testDebugUnitTest -PQINGKUI_ENV=test
+      - name: Android Lint
+        run: ./gradlew :app:lintDebug -PQINGKUI_ENV=test
       - name: Build Debug APK
         run: ./gradlew :app:assembleDebug -PQINGKUI_ENV=test
       - name: Upload Debug APK

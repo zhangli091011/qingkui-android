@@ -33,11 +33,14 @@ import cn.qingkui.app.ui.model.QaClarification
 import cn.qingkui.app.ui.model.QaClarificationOption
 import cn.qingkui.app.ui.model.UnderstandingCheck
 import cn.qingkui.app.ui.model.UnderstandingCheckChoice
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.flow.Flow
@@ -278,6 +281,91 @@ class AppViewModelTest {
     }
 
     @Test
+    fun stoppingStreamCancelsRequestAndMarksPartialAnswerOnlyOnce() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val gate = CompletableDeferred<Unit>()
+            val repository = FakeRepository(streamGates = mutableListOf(gate))
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+            viewModel.updateDraft("解释二次函数")
+
+            viewModel.sendMessage()
+            runCurrent()
+            assertEquals("二次函数", viewModel.uiState.value.messages.last().text)
+
+            viewModel.stopGenerating()
+            runCurrent()
+            viewModel.stopGenerating()
+
+            assertEquals(1, repository.cancelledQuestions)
+            assertEquals(false, viewModel.uiState.value.sending)
+            assertEquals("二次函数\n\n已停止生成", viewModel.uiState.value.messages.last().text)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun stoppingDuringClarificationDoesNotModifyPreviousAnswer() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val clarificationGate = CompletableDeferred<Unit>()
+            val repository = FakeRepository(clarifyVague = true, clarificationGate = clarificationGate)
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+            viewModel.updateDraft("二次函数是什么？")
+            viewModel.sendMessage()
+            advanceUntilIdle()
+            val previousAnswer = viewModel.uiState.value.messages.last()
+
+            viewModel.updateDraft("这个怎么做")
+            viewModel.sendMessage()
+            runCurrent()
+            viewModel.stopGenerating()
+            runCurrent()
+
+            assertEquals(2, viewModel.uiState.value.messages.size)
+            assertEquals(previousAnswer, viewModel.uiState.value.messages.last())
+            assertEquals(null, viewModel.uiState.value.qaClarification)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun sendingAgainImmediatelyAfterStopKeepsNewRequestActive() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val firstGate = CompletableDeferred<Unit>()
+            val secondGate = CompletableDeferred<Unit>()
+            val repository = FakeRepository(streamGates = mutableListOf(firstGate, secondGate))
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+            viewModel.updateDraft("第一问")
+            viewModel.sendMessage()
+            runCurrent()
+
+            viewModel.stopGenerating()
+            viewModel.updateDraft("第二问")
+            viewModel.sendMessage()
+            runCurrent()
+
+            assertEquals(2, repository.questionsSent)
+            assertEquals(true, viewModel.uiState.value.sending)
+            assertEquals("二次函数", viewModel.uiState.value.messages.last().text)
+            assertEquals(4, viewModel.uiState.value.messages.map { it.id }.distinct().size)
+
+            secondGate.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(false, viewModel.uiState.value.sending)
+            assertEquals("二次函数回答", viewModel.uiState.value.messages.last().text)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun guestCannotOpenMistakeCameraWithoutLogin() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
@@ -481,9 +569,12 @@ private class FakeRepository(
     private val authenticated: Boolean = true,
     private val clarifyVague: Boolean = false,
     private var privacyRequired: Boolean = false,
+    private val streamGates: MutableList<CompletableDeferred<Unit>> = mutableListOf(),
+    private val clarificationGate: CompletableDeferred<Unit>? = null,
 ) : AppRepository {
     var privacyAccepted = false
     var questionsSent = 0
+    var cancelledQuestions = 0
     val revokedSessions = mutableListOf<String>()
     val feedbackSubmissions = mutableListOf<Pair<String, String>>()
     val analyzedMistakes = mutableListOf<String>()
@@ -575,6 +666,7 @@ private class FakeRepository(
     override suspend fun deleteSession(sessionId: String) = Unit
     override suspend fun clarifyQaIntent(question: String, mode: QaMode): QaClarification? =
         if (clarifyVague && question == "这个怎么做") {
+            clarificationGate?.await()
             QaClarification(
                 question,
                 "你希望我怎样帮助你？",
@@ -614,6 +706,15 @@ private class FakeRepository(
     ): QaAnswer {
         questionsSent++
         onDelta("二次函数")
+        val gate = streamGates.removeFirstOrNull()
+        if (gate != null) {
+            try {
+                gate.await()
+            } catch (cancelled: CancellationException) {
+                cancelledQuestions++
+                throw cancelled
+            }
+        }
         onDelta("回答")
         return QaAnswer(
             conversationId = "session-1",

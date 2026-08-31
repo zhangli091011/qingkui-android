@@ -42,6 +42,8 @@ class AppViewModel(
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
     private var mistakePollingJob: Job? = null
     private var qaJob: Job? = null
+    private var qaAssistantMessageId: Long? = null
+    private var lastLocalMessageId: Long = 0
 
     init {
         viewModelScope.launch {
@@ -602,14 +604,15 @@ class AppViewModel(
     fun dismissQaClarification() = _uiState.update { it.copy(qaClarification = null) }
 
     fun stopGenerating() {
+        val stoppedAssistantId = qaAssistantMessageId
         qaJob?.cancel()
         qaJob = null
+        qaAssistantMessageId = null
         _uiState.update { state ->
-            val lastAssistant = state.messages.indexOfLast { it.author == MessageAuthor.Assistant }
             state.copy(
                 sending = false,
-                messages = state.messages.mapIndexed { index, message ->
-                    if (index == lastAssistant) {
+                messages = state.messages.map { message ->
+                    if (message.id == stoppedAssistantId) {
                         message.copy(text = if (message.text.isBlank()) "已停止生成" else "${message.text}\n\n已停止生成")
                     } else message
                 },
@@ -636,8 +639,10 @@ class AppViewModel(
                         return@launch
                     }
                 }
-                messageId = System.currentTimeMillis()
+                messageId = maxOf(System.currentTimeMillis(), lastLocalMessageId + 1)
                 assistantMessageId = messageId + 1
+                lastLocalMessageId = assistantMessageId
+                qaAssistantMessageId = assistantMessageId
                 _uiState.update {
                     it.copy(
                         draft = "",
@@ -687,7 +692,9 @@ class AppViewModel(
                     )
                 }
             } finally {
-                qaJob = null
+                val currentJob = currentCoroutineContext()[Job]
+                if (qaJob === currentJob) qaJob = null
+                if (qaAssistantMessageId == assistantMessageId) qaAssistantMessageId = null
             }
         }
     }
