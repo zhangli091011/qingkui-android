@@ -44,6 +44,7 @@ import cn.qingkui.app.ui.model.CreditLedgerItem
 import cn.qingkui.app.ui.model.DeviceSessionItem
 import cn.qingkui.app.ui.model.FeedbackItem
 import cn.qingkui.app.ui.model.ClassOverviewItem
+import cn.qingkui.app.ui.model.ClassAggregateCountItem
 import cn.qingkui.app.ui.model.ClassStudentOverviewItem
 import cn.qingkui.app.ui.model.ContributionItem
 import cn.qingkui.app.ui.model.CreditCampaignItem
@@ -318,6 +319,11 @@ class NetworkAppRepository(
             questions = value.questions,
             mistakes = value.mistakes,
             verifiedNodes = value.verifiedNodes,
+            topErrorCategories = value.topErrorCategories.map { ClassAggregateCountItem(it.label, it.count) },
+            weakKnowledgePoints = value.weakKnowledgePoints.map { ClassAggregateCountItem(it.label, it.count) },
+            practiceCompletionRate = value.practiceCompletionRate,
+            secondAttemptAccuracy = value.secondAttemptAccuracy,
+            dueReviewCount = value.dueReviewCount,
             students = value.students.map { student ->
                 ClassStudentOverviewItem(student.anonymousId, student.lastActivityAt?.displayDateTime(), student.questions, student.mistakes, student.verifiedNodes)
             },

@@ -219,6 +219,12 @@ data class ClassStudentOverviewItem(
 )
 
 @Immutable
+data class ClassAggregateCountItem(
+    val label: String,
+    val count: Int,
+)
+
+@Immutable
 data class ClassOverviewItem(
     val classroom: SchoolClassItem,
     val studentCount: Int,
@@ -226,6 +232,11 @@ data class ClassOverviewItem(
     val questions: Int,
     val mistakes: Int,
     val verifiedNodes: Int,
+    val topErrorCategories: List<ClassAggregateCountItem>,
+    val weakKnowledgePoints: List<ClassAggregateCountItem>,
+    val practiceCompletionRate: Double,
+    val secondAttemptAccuracy: Double,
+    val dueReviewCount: Int,
     val students: List<ClassStudentOverviewItem>,
 )
 

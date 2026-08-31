@@ -118,6 +118,10 @@ data class ClassStudentOverviewDto(
     val mistakes: Int,
     @SerializedName("verified_nodes") val verifiedNodes: Int,
 )
+data class ClassAggregateCountDto(
+    val label: String,
+    val count: Int,
+)
 data class ClassOverviewDto(
     val classroom: SchoolClassDto,
     @SerializedName("student_count") val studentCount: Int,
@@ -125,6 +129,11 @@ data class ClassOverviewDto(
     val questions: Int,
     val mistakes: Int,
     @SerializedName("verified_nodes") val verifiedNodes: Int,
+    @SerializedName("top_error_categories") val topErrorCategories: List<ClassAggregateCountDto>,
+    @SerializedName("weak_knowledge_points") val weakKnowledgePoints: List<ClassAggregateCountDto>,
+    @SerializedName("practice_completion_rate") val practiceCompletionRate: Double,
+    @SerializedName("second_attempt_accuracy") val secondAttemptAccuracy: Double,
+    @SerializedName("due_review_count") val dueReviewCount: Int,
     val students: List<ClassStudentOverviewDto>,
 )
 

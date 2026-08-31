@@ -54,6 +54,7 @@ import cn.qingkui.app.ui.model.CreditCampaignItem
 import cn.qingkui.app.ui.model.CreditRedemptionItem
 import cn.qingkui.app.ui.model.SchoolClassItem
 import cn.qingkui.app.ui.model.SchoolMembershipItem
+import kotlin.math.roundToInt
 
 private enum class CommunityTab(val label: String) {
     School("学校班级"),
@@ -197,10 +198,37 @@ private fun ClassOverviewCard(overview: ClassOverviewItem) {
         Text("${overview.classroom.name} · 匿名班级趋势", fontWeight = FontWeight.Bold)
         Text("${overview.studentCount} 名学生 · 近 7 日活跃 ${overview.active7dStudents} 人", style = MaterialTheme.typography.bodySmall)
         Text("提问 ${overview.questions} · 错题 ${overview.mistakes} · 已验证知识点 ${overview.verifiedNodes}", style = MaterialTheme.typography.bodySmall)
+        Text(
+            "练习完成 ${(overview.practiceCompletionRate * 100).roundToInt()}% · 二次作答正确 ${(overview.secondAttemptAccuracy * 100).roundToInt()}% · 待复习 ${overview.dueReviewCount}",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (overview.topErrorCategories.isNotEmpty()) {
+            Text(
+                "主要错因：" + overview.topErrorCategories.joinToString("、") { "${errorCategoryLabel(it.label)} ${it.count}" },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (overview.weakKnowledgePoints.isNotEmpty()) {
+            Text(
+                "薄弱知识点：" + overview.weakKnowledgePoints.joinToString("、") { "${it.label} ${it.count}" },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         overview.students.take(5).forEach { student ->
             Text("学生 ${student.anonymousId.take(8)} · 提问 ${student.questions} · 错题 ${student.mistakes} · 知识点 ${student.verifiedNodes}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+}
+
+private fun errorCategoryLabel(value: String): String = when (value) {
+    "concept" -> "概念"
+    "reading" -> "审题"
+    "method" -> "方法"
+    "calculation" -> "计算"
+    "expression" -> "表达"
+    else -> "未分类"
 }
 
 @Composable
