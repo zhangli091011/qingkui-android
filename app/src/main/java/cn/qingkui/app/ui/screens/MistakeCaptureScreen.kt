@@ -231,7 +231,7 @@ private fun MistakeImageEditor(
     var question by remember { mutableStateOf("") }
     var studentWork by remember { mutableStateOf("") }
     var goal by remember { mutableStateOf("分析错因并给出同类练习") }
-    var errorCategory by remember { mutableStateOf("method") }
+    var errorCategory by remember { mutableStateOf("") }
     var rotationDegrees by remember { mutableStateOf(0) }
     var cropInsetFraction by remember { mutableStateOf(0f) }
     var processing by remember { mutableStateOf(false) }
@@ -310,7 +310,7 @@ private fun MistakeImageEditor(
             OutlinedTextField(subject, { subject = it }, label = { Text("学科") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             OutlinedTextField(question, { question = it }, label = { Text("题目文字（可留空交给 OCR）") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
             OutlinedTextField(studentWork, { studentWork = it }, label = { Text("我的作答过程") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-            Text("错因类型", style = MaterialTheme.typography.labelLarge)
+            Text("错因类型（请选择最接近的一项）", style = MaterialTheme.typography.labelLarge)
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -357,7 +357,7 @@ private fun MistakeImageEditor(
                         }
                     }
                 },
-                enabled = !processing && (imagePath != null || question.isNotBlank()),
+                enabled = !processing && errorCategory.isNotBlank() && (imagePath != null || question.isNotBlank()),
                 modifier = Modifier.fillMaxWidth().height(48.dp),
             ) { Text(if (processing) "正在处理图片" else "保存并开始识别") }
             processingError?.let {
