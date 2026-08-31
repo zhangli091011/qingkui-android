@@ -8,6 +8,7 @@ import cn.qingkui.app.data.repository.QaAnswer
 import cn.qingkui.app.data.repository.ServiceAvailability
 import cn.qingkui.app.data.repository.UnderstandingCheckOutcome
 import cn.qingkui.app.ui.model.AppDestination
+import cn.qingkui.app.ui.model.AuthMode
 import cn.qingkui.app.ui.model.AnswerFeedbackAction
 import cn.qingkui.app.ui.model.ChatMessage
 import cn.qingkui.app.ui.model.CreditLedgerItem
@@ -171,6 +172,30 @@ class AppViewModelTest {
 
             assertTrue(repository.privacyAccepted)
             assertEquals(false, viewModel.uiState.value.privacyConsentRequired)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun registrationPassesTheUsersExplicitPrivacyChoiceToRepository() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository(authenticated = false)
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+            viewModel.setAuthMode(AuthMode.Register)
+            viewModel.updateUsername("privacy_student")
+            viewModel.updatePassword("privacy-pass-123")
+            viewModel.updateNickname("隐私测试")
+
+            viewModel.submitAuth(privacyAccepted = false)
+            advanceUntilIdle()
+            assertEquals(null, repository.registrationPrivacyConsent)
+
+            viewModel.submitAuth(privacyAccepted = true)
+            advanceUntilIdle()
+            assertEquals(true, repository.registrationPrivacyConsent)
         } finally {
             Dispatchers.resetMain()
         }
@@ -703,6 +728,7 @@ private class FakeRepository(
     private val aiAvailable: Boolean = true,
 ) : AppRepository {
     var privacyAccepted = false
+    var registrationPrivacyConsent: Boolean? = null
     var questionsSent = 0
     var cancelledQuestions = 0
     val revokedSessions = mutableListOf<String>()
@@ -736,7 +762,16 @@ private class FakeRepository(
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null
     override suspend fun login(username: String, password: String) = "测试同学"
-    override suspend fun register(username: String, password: String, nickname: String, email: String) = nickname
+    override suspend fun register(
+        username: String,
+        password: String,
+        nickname: String,
+        email: String,
+        privacyConsent: Boolean,
+    ): String {
+        registrationPrivacyConsent = privacyConsent
+        return nickname
+    }
     override suspend fun privacyConsentRequired() = privacyRequired
     override suspend fun acceptPrivacyConsent() {
         privacyAccepted = true

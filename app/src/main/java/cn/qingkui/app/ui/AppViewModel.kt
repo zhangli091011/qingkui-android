@@ -129,7 +129,13 @@ class AppViewModel(
                 val name = if (state.authMode == AuthMode.Login) {
                     repository.login(state.username, state.password)
                 } else {
-                    repository.register(state.username, state.password, state.nickname, state.email)
+                    repository.register(
+                        state.username,
+                        state.password,
+                        state.nickname,
+                        state.email,
+                        privacyAccepted,
+                    )
                 }
                 val consentRequired = repository.privacyConsentRequired()
                 _uiState.update {

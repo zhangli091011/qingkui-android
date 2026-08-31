@@ -13,7 +13,7 @@ data class RegisterRequest(
     val password: String,
     val nickname: String?,
     val email: String? = null,
-    @SerializedName("privacy_consent") val privacyConsent: Boolean = true,
+    @SerializedName("privacy_consent") val privacyConsent: Boolean = false,
     @SerializedName("privacy_notice_version") val privacyNoticeVersion: String,
     @SerializedName("device_name") val deviceName: String = "Qingkui Android",
 )

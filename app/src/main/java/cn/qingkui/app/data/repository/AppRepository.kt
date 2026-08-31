@@ -118,7 +118,13 @@ interface AppRepository {
     suspend fun hasSession(): Boolean
     suspend fun nickname(): String?
     suspend fun login(username: String, password: String): String
-    suspend fun register(username: String, password: String, nickname: String, email: String): String
+    suspend fun register(
+        username: String,
+        password: String,
+        nickname: String,
+        email: String,
+        privacyConsent: Boolean,
+    ): String
     suspend fun privacyConsentRequired(): Boolean
     suspend fun acceptPrivacyConsent()
     suspend fun requestPasswordReset(email: String)
@@ -212,13 +218,20 @@ class NetworkAppRepository(
         api.login(LoginRequest(username.trim(), password)).also { tokenStore.save(it) }.user.nickname
     }
 
-    override suspend fun register(username: String, password: String, nickname: String, email: String): String = apiCall {
+    override suspend fun register(
+        username: String,
+        password: String,
+        nickname: String,
+        email: String,
+        privacyConsent: Boolean,
+    ): String = apiCall {
         api.register(
             RegisterRequest(
                 username.trim(),
                 password,
                 nickname.trim().ifBlank { null },
                 email.trim().ifBlank { null },
+                privacyConsent = privacyConsent,
                 privacyNoticeVersion = BuildConfig.PRIVACY_NOTICE_VERSION,
             )
         )
