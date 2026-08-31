@@ -11,12 +11,15 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -221,6 +224,7 @@ fun QingkuiApp() {
                         onAnalyzeMistake = viewModel::analyzeMistake,
                         onGeneratePractice = viewModel::generateMistakePractice,
                         onSubmitPractice = viewModel::submitMistakePractice,
+                        onAskMistake = viewModel::askAboutMistake,
                     )
                     AppDestination.Account -> AccountScreen(
                         compact = compact,
@@ -261,5 +265,24 @@ fun QingkuiApp() {
                 modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter),
             )
         }
+    }
+    if (uiState.authenticated && uiState.privacyConsentRequired) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("隐私说明已更新") },
+            text = {
+                Text(
+                    "继续使用前，请确认当前版本（${cn.qingkui.app.BuildConfig.PRIVACY_NOTICE_VERSION}）。青葵只处理完成账户、问答、错题与复习所需的数据；请勿提交真实身份、联系方式或与学习无关的信息。AI 结论可能出错，重要内容应结合教材或老师核验。本确认不替代学校或监护人的校内试点授权。"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::acceptPrivacyConsent, enabled = !uiState.authLoading) {
+                    Text(if (uiState.authLoading) "提交中" else "同意并继续")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::logout, enabled = !uiState.authLoading) { Text("退出登录") }
+            },
+        )
     }
 }

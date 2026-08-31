@@ -13,11 +13,25 @@ data class RegisterRequest(
     val password: String,
     val nickname: String?,
     val email: String? = null,
+    @SerializedName("privacy_consent") val privacyConsent: Boolean = true,
+    @SerializedName("privacy_notice_version") val privacyNoticeVersion: String,
     @SerializedName("device_name") val deviceName: String = "Qingkui Android",
 )
 
 data class RefreshRequest(@SerializedName("refresh_token") val refreshToken: String)
 data class LogoutRequest(@SerializedName("refresh_token") val refreshToken: String)
+
+data class PrivacyConsentRequest(
+    val accepted: Boolean = true,
+    @SerializedName("notice_version") val noticeVersion: String,
+)
+
+data class PrivacyConsentResponse(
+    val required: Boolean,
+    @SerializedName("required_version") val requiredVersion: String,
+    @SerializedName("accepted_version") val acceptedVersion: String?,
+    @SerializedName("accepted_at") val acceptedAt: String?,
+)
 
 data class DeviceSessionDto(
     val id: String,
@@ -464,6 +478,8 @@ data class MistakeWeeklyReviewDto(
     @SerializedName("error_categories") val errorCategories: Map<String, Int> = emptyMap(),
     @SerializedName("weak_knowledge_points") val weakKnowledgePoints: List<WeakKnowledgePointDto> = emptyList(),
     @SerializedName("due_reviews") val dueReviews: List<WeeklyMistakeLinkDto> = emptyList(),
+    @SerializedName("upload_success_rate") val uploadSuccessRate: Double,
+    @SerializedName("ocr_correction_rate") val ocrCorrectionRate: Double,
     @SerializedName("practice_completion_rate") val practiceCompletionRate: Double,
     @SerializedName("authoritative_accuracy") val authoritativeAccuracy: Double,
     @SerializedName("second_attempt_accuracy") val secondAttemptAccuracy: Double,

@@ -49,6 +49,45 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelTest {
     @Test
+    fun existingSessionWaitsForUpdatedPrivacyConsent() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository(privacyRequired = true)
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value.privacyConsentRequired)
+            viewModel.acceptPrivacyConsent()
+            advanceUntilIdle()
+
+            assertTrue(repository.privacyAccepted)
+            assertEquals(false, viewModel.uiState.value.privacyConsentRequired)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun mistakeCanBeCarriedIntoPrivateErrorReviewChat() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val viewModel = AppViewModel(FakeRepository())
+            advanceUntilIdle()
+            val mistake = mistakeWithStatus("succeeded").copy(knowledgeNodeId = "quadratic_function")
+
+            viewModel.askAboutMistake(mistake)
+
+            val state = viewModel.uiState.value
+            assertEquals(AppDestination.Chat, state.destination)
+            assertEquals(QaMode.Error, state.qaMode)
+            assertEquals("quadratic_function", state.selectedNodeId)
+            assertTrue(state.draft.contains(mistake.questionText))
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun communityActionsUseRepositoryAndRefreshBalance() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
@@ -441,7 +480,9 @@ private class FakeRepository(
     private val answerBalance: Int = 1280,
     private val authenticated: Boolean = true,
     private val clarifyVague: Boolean = false,
+    private var privacyRequired: Boolean = false,
 ) : AppRepository {
+    var privacyAccepted = false
     var questionsSent = 0
     val revokedSessions = mutableListOf<String>()
     val feedbackSubmissions = mutableListOf<Pair<String, String>>()
@@ -468,6 +509,11 @@ private class FakeRepository(
     override suspend fun nickname(): String? = null
     override suspend fun login(username: String, password: String) = "测试同学"
     override suspend fun register(username: String, password: String, nickname: String, email: String) = nickname
+    override suspend fun privacyConsentRequired() = privacyRequired
+    override suspend fun acceptPrivacyConsent() {
+        privacyAccepted = true
+        privacyRequired = false
+    }
     override suspend fun requestPasswordReset(email: String) = Unit
     override suspend fun confirmPasswordReset(token: String, newPassword: String) = Unit
     override suspend fun logout() = Unit
@@ -599,6 +645,8 @@ private class FakeRepository(
         newMistakes = 0,
         dueReviewCount = 0,
         topErrorCategory = null,
+        uploadSuccessRate = 0.0,
+        ocrCorrectionRate = 0.0,
         practiceCompletionRate = 0.0,
         authoritativeAccuracy = 0.0,
         secondAttemptAccuracy = 0.0,

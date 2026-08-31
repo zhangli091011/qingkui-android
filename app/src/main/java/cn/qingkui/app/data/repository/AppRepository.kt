@@ -1,5 +1,7 @@
 package cn.qingkui.app.data.repository
 
+import cn.qingkui.app.BuildConfig
+
 import android.content.Context
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
@@ -114,6 +116,8 @@ interface AppRepository {
     suspend fun nickname(): String?
     suspend fun login(username: String, password: String): String
     suspend fun register(username: String, password: String, nickname: String, email: String): String
+    suspend fun privacyConsentRequired(): Boolean
+    suspend fun acceptPrivacyConsent()
     suspend fun requestPasswordReset(email: String)
     suspend fun confirmPasswordReset(token: String, newPassword: String)
     suspend fun logout()
@@ -197,9 +201,28 @@ class NetworkAppRepository(
     }
 
     override suspend fun register(username: String, password: String, nickname: String, email: String): String = apiCall {
-        api.register(RegisterRequest(username.trim(), password, nickname.trim().ifBlank { null }, email.trim().ifBlank { null }))
+        api.register(
+            RegisterRequest(
+                username.trim(),
+                password,
+                nickname.trim().ifBlank { null },
+                email.trim().ifBlank { null },
+                privacyNoticeVersion = BuildConfig.PRIVACY_NOTICE_VERSION,
+            )
+        )
             .also { tokenStore.save(it) }
             .user.nickname
+    }
+
+    override suspend fun privacyConsentRequired(): Boolean = apiCall { api.privacyConsent().required }
+
+    override suspend fun acceptPrivacyConsent() = apiCall {
+        api.acceptPrivacyConsent(
+            cn.qingkui.app.data.remote.dto.PrivacyConsentRequest(
+                noticeVersion = BuildConfig.PRIVACY_NOTICE_VERSION,
+            )
+        )
+        Unit
     }
 
     override suspend fun requestPasswordReset(email: String) = apiCall {
@@ -689,6 +712,8 @@ class NetworkAppRepository(
                     mistakeCount = it.mistakeCount,
                 )
             },
+            uploadSuccessRate = report.uploadSuccessRate,
+            ocrCorrectionRate = report.ocrCorrectionRate,
             practiceCompletionRate = report.practiceCompletionRate,
             authoritativeAccuracy = report.authoritativeAccuracy,
             secondAttemptAccuracy = report.secondAttemptAccuracy,

@@ -27,6 +27,8 @@ import cn.qingkui.app.data.remote.dto.NeighborResponse
 import cn.qingkui.app.data.remote.dto.QaResultDto
 import cn.qingkui.app.data.remote.dto.RefreshRequest
 import cn.qingkui.app.data.remote.dto.RegisterRequest
+import cn.qingkui.app.data.remote.dto.PrivacyConsentRequest
+import cn.qingkui.app.data.remote.dto.PrivacyConsentResponse
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -63,6 +65,12 @@ interface QingkuiApi {
 
     @POST("auth/logout")
     suspend fun logout(@Body body: LogoutRequest)
+
+    @GET("auth/privacy-consent")
+    suspend fun privacyConsent(): PrivacyConsentResponse
+
+    @POST("auth/privacy-consent")
+    suspend fun acceptPrivacyConsent(@Body body: PrivacyConsentRequest): PrivacyConsentResponse
 
     @POST("auth/change-password")
     suspend fun changePassword(@Body body: ChangePasswordRequest)

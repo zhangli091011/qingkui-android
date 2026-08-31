@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import cn.qingkui.app.BuildConfig
 import cn.qingkui.app.ui.model.AuthMode
 
 @Composable
@@ -52,7 +54,7 @@ fun AuthScreen(
     onEmailChange: (String) -> Unit,
     onRequestPasswordReset: (String) -> Unit,
     onConfirmPasswordReset: (String, String) -> Unit,
-    onSubmit: () -> Unit,
+    onSubmit: (Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
     var resetOpen by remember { mutableStateOf(false) }
@@ -60,6 +62,8 @@ fun AuthScreen(
     var resetEmail by remember { mutableStateOf("") }
     var resetToken by remember { mutableStateOf("") }
     var resetPassword by remember { mutableStateOf("") }
+    var privacyAccepted by remember(mode) { mutableStateOf(false) }
+    var privacyOpen by remember { mutableStateOf(false) }
     Box(
         modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp),
         contentAlignment = Alignment.Center,
@@ -108,17 +112,34 @@ fun AuthScreen(
                 enabled = !loading,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { onSubmit() }),
+                keyboardActions = KeyboardActions(onDone = { onSubmit(privacyAccepted) }),
             )
+            if (mode == AuthMode.Register) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = privacyAccepted,
+                        onCheckedChange = { privacyAccepted = it },
+                        enabled = !loading,
+                    )
+                    Text("我已阅读并同意", style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { privacyOpen = true }) { Text("隐私说明") }
+                }
+                Text(
+                    "该同意仅用于账户与学习数据处理，不替代学校或监护人对校内试点的授权。",
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             errorMessage?.let {
                 Spacer(Modifier.height(10.dp))
                 Text(it, modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
             }
             Spacer(Modifier.height(20.dp))
             Button(
-                onClick = onSubmit,
+                onClick = { onSubmit(privacyAccepted) },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                enabled = !loading,
+                enabled = !loading && (mode == AuthMode.Login || privacyAccepted),
                 shape = RoundedCornerShape(8.dp),
             ) {
                 if (loading) CircularProgressIndicator(modifier = Modifier.height(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
@@ -158,6 +179,23 @@ fun AuthScreen(
                 }) { Text(if (resetRequested) "重置密码" else "发送邮件") }
             },
             dismissButton = { TextButton(onClick = { resetOpen = false }) { Text("取消") } },
+        )
+    }
+    if (privacyOpen) {
+        AlertDialog(
+            onDismissRequest = { privacyOpen = false },
+            title = { Text("隐私说明（${BuildConfig.PRIVACY_NOTICE_VERSION}）") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("青葵仅收集完成账户、问答、错题、复习和额度记录所需的数据。请勿提交真实姓名、证件、手机号、住址或与学习无关的信息。")
+                    Text("错题图片存放于私有对象存储；模型服务只接收完成本次学习任务所需的内容。AI 可能出错，重要结论应结合教材或老师核验。")
+                    Text("你可以删除错题和会话、退出登录或注销账户。未完成学校及监护相关授权前，不应参加未成年人校内试点。")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { privacyAccepted = true; privacyOpen = false }) { Text("同意并继续") }
+            },
+            dismissButton = { TextButton(onClick = { privacyOpen = false }) { Text("返回") } },
         )
     }
 }

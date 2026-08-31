@@ -25,6 +25,7 @@ val environmentConfig = loadEnvironment(qingkuiEnvironment)
 val qingkuiApiBaseUrl = providers.gradleProperty("QINGKUI_API_BASE_URL")
     .orElse(environmentConfig.getProperty("apiBaseUrl"))
     .get()
+val privacyNoticeVersion = environmentConfig.getProperty("privacyNoticeVersion", "2026-08-31")
 val productionApiBaseUrl = loadEnvironment("production").getProperty("apiBaseUrl")
 val releaseApiBaseUrl = when (qingkuiEnvironment) {
     "pilot", "production" -> qingkuiApiBaseUrl
@@ -63,6 +64,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         buildConfigField("String", "API_BASE_URL", "\"$qingkuiApiBaseUrl\"")
+        buildConfigField("String", "PRIVACY_NOTICE_VERSION", "\"$privacyNoticeVersion\"")
     }
 
     signingConfigs {

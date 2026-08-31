@@ -86,6 +86,7 @@ fun LearningScreen(
     onAnalyzeMistake: (String) -> Unit,
     onGeneratePractice: (String) -> Unit,
     onSubmitPractice: (String, String, String) -> Unit,
+    onAskMistake: (MistakeItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -124,6 +125,7 @@ fun LearningScreen(
                     onAnalyze = onAnalyzeMistake,
                     onGeneratePractice = onGeneratePractice,
                     onSubmitPractice = onSubmitPractice,
+                    onAskMistake = onAskMistake,
                     onOpenKnowledgeNode = onOpenItem,
                 )
             } else {
@@ -236,6 +238,7 @@ private fun MistakeBookContent(
     onAnalyze: (String) -> Unit,
     onGeneratePractice: (String) -> Unit,
     onSubmitPractice: (String, String, String) -> Unit,
+    onAskMistake: (MistakeItem) -> Unit,
     onOpenKnowledgeNode: (String) -> Unit,
 ) {
     var editing by remember { mutableStateOf<MistakeItem?>(null) }
@@ -320,7 +323,12 @@ private fun MistakeBookContent(
                 }
             }
             Text(
-                "练习完成 ${(report.practiceCompletionRate * 100).toInt()}% · 权威正确 ${(report.authoritativeAccuracy * 100).toInt()}% · 二次正确 ${(report.secondAttemptAccuracy * 100).toInt()}% · 7日回访 ${(report.sevenDayFollowupRate * 100).toInt()}%",
+                "上传成功 ${(report.uploadSuccessRate * 100).toInt()}% · OCR校对 ${(report.ocrCorrectionRate * 100).toInt()}% · 练习完成 ${(report.practiceCompletionRate * 100).toInt()}%",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "权威正确 ${(report.authoritativeAccuracy * 100).toInt()}% · 二次正确 ${(report.secondAttemptAccuracy * 100).toInt()}% · 7日回访 ${(report.sevenDayFollowupRate * 100).toInt()}%",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -391,6 +399,7 @@ private fun MistakeBookContent(
                         )
                     }
                     Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { onAskMistake(item) }) { Text("带入 AI 继续追问") }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (item.confidence != null) Text("置信度 ${(item.confidence * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (item.requiresReview && item.ocrTaskId != null && item.ocrStatus == "succeeded") {

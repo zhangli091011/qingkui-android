@@ -19,6 +19,7 @@ import cn.qingkui.app.ui.model.QaClarificationOption
 import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.KnowledgeCatalogScope
 import cn.qingkui.app.ui.model.LearningFilter
+import cn.qingkui.app.ui.model.MistakeItem
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -59,14 +60,18 @@ class AppViewModel(
         }
         viewModelScope.launch {
             val hasSession = repository.hasSession()
+            val consentRequired = if (hasSession) {
+                runCatching { repository.privacyConsentRequired() }.getOrDefault(false)
+            } else false
             _uiState.update {
                 it.copy(
                     authChecking = false,
                     authenticated = hasSession,
+                    privacyConsentRequired = consentRequired,
                     currentUserName = repository.nickname() ?: it.currentUserName,
                 )
             }
-            if (hasSession) refreshContent()
+            if (hasSession && !consentRequired) refreshContent()
         }
     }
 
@@ -76,10 +81,14 @@ class AppViewModel(
     fun updateNickname(value: String) = _uiState.update { it.copy(nickname = value, errorMessage = null) }
     fun updateEmail(value: String) = _uiState.update { it.copy(email = value, errorMessage = null) }
 
-    fun submitAuth() {
+    fun submitAuth(privacyAccepted: Boolean = false) {
         val state = _uiState.value
         if (state.username.trim().length < 3 || state.password.length < 8) {
             _uiState.update { it.copy(errorMessage = "用户名至少 3 位，密码至少 8 位") }
+            return
+        }
+        if (state.authMode == AuthMode.Register && !privacyAccepted) {
+            _uiState.update { it.copy(errorMessage = "请先阅读并同意隐私说明") }
             return
         }
         viewModelScope.launch {
@@ -90,19 +99,38 @@ class AppViewModel(
                 } else {
                     repository.register(state.username, state.password, state.nickname, state.email)
                 }
+                val consentRequired = repository.privacyConsentRequired()
                 _uiState.update {
                     it.copy(
                         authenticated = true,
+                        privacyConsentRequired = consentRequired,
                         authScreenOpen = false,
                         authLoading = false,
                         password = "",
                         email = "",
                         currentUserName = name,
-                        pendingSendAfterAuth = false,
+                        pendingSendAfterAuth = if (consentRequired) state.pendingSendAfterAuth else false,
                     )
                 }
+                if (!consentRequired) {
+                    refreshContentNow()
+                    if (state.pendingSendAfterAuth) sendMessage()
+                }
+            } catch (error: Exception) {
+                _uiState.update { it.copy(authLoading = false, errorMessage = error.userMessage()) }
+            }
+        }
+    }
+
+    fun acceptPrivacyConsent() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(authLoading = true, errorMessage = null) }
+            try {
+                repository.acceptPrivacyConsent()
+                val shouldSend = _uiState.value.pendingSendAfterAuth
+                _uiState.update { it.copy(privacyConsentRequired = false, authLoading = false) }
                 refreshContentNow()
-                if (state.pendingSendAfterAuth) sendMessage()
+                if (shouldSend) sendMessage()
             } catch (error: Exception) {
                 _uiState.update { it.copy(authLoading = false, errorMessage = error.userMessage()) }
             }
@@ -531,6 +559,20 @@ class AppViewModel(
     }
 
     fun updateDraft(value: String) = _uiState.update { it.copy(draft = value, errorMessage = null) }
+
+    fun askAboutMistake(item: MistakeItem) {
+        _uiState.update {
+            it.copy(
+                destination = AppDestination.Chat,
+                qaMode = QaMode.Error,
+                conversationId = null,
+                messages = emptyList(),
+                draft = "请帮我复盘这道错题，先指出关键错因，再逐步提示我重新完成：\n${item.questionText}",
+                selectedNodeId = item.knowledgeNodeId,
+                errorMessage = null,
+            )
+        }
+    }
     fun selectHelpLevel(value: QaHelpLevel) = _uiState.update { it.copy(helpLevel = value, errorMessage = null) }
     fun selectQaMode(value: QaMode) = _uiState.update { it.copy(qaMode = value, errorMessage = null, conversationId = null, messages = emptyList()) }
 
@@ -926,17 +968,24 @@ class AppViewModel(
 
     private fun handleApiError(error: Exception, update: (AppUiState) -> AppUiState) {
         val unauthorized = error is ApiFailureException && error.statusCode == 401
+        val privacyRequired = error is ApiFailureException && error.statusCode == 428
         _uiState.update {
             update(it).copy(
                 authenticated = if (unauthorized) false else it.authenticated,
+                privacyConsentRequired = privacyRequired || it.privacyConsentRequired,
                 authScreenOpen = false,
-                errorMessage = if (unauthorized) "登录已过期，请重新登录" else error.userMessage(),
+                errorMessage = when {
+                    unauthorized -> "登录已过期，请重新登录"
+                    privacyRequired -> null
+                    else -> error.userMessage()
+                },
             )
         }
     }
 
     private fun Exception.userMessage(): String = when ((this as? ApiFailureException)?.statusCode) {
         402 -> "额度不足，请先补充额度"
+        428 -> "请先阅读并同意当前版本的隐私说明"
         502 -> "AI 服务暂时不可用，本次未扣除额度"
         503 -> "AI 服务尚未配置，请联系管理员"
         else -> message ?: "发生未知错误，请稍后重试"
