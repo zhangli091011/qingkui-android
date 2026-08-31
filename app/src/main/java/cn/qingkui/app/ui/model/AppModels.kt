@@ -292,6 +292,7 @@ data class MistakeItem(
     val ocrErrorMessage: String? = null,
     val confidence: Double?,
     val requiresReview: Boolean,
+    val reviewReasons: List<String> = emptyList(),
     val errorCategory: String?,
     val errorNote: String?,
     val analysisStatus: String,

@@ -425,6 +425,13 @@ private fun MistakeBookContent(
                             TextButton(onClick = { onGeneratePractice(item.id) }, enabled = !loading) { Text("开始下一轮") }
                         }
                     }
+                    if (item.requiresReview && item.reviewReasons.isNotEmpty()) {
+                        Text(
+                            item.reviewReasons.joinToString(" · ") { ocrReviewReasonLabel(it) },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                     Text(
                         "复习阶段：${reviewStageLabel(item.reviewStage)} · 连续通过 ${item.reviewStreak} 轮",
                         style = MaterialTheme.typography.bodySmall,
@@ -484,6 +491,7 @@ private fun MistakeBookContent(
             }
         }
     }
+
     val current = editing
     if (current != null && current.ocrTaskId != null) {
         AlertDialog(
@@ -574,6 +582,18 @@ private fun MistakeBookContent(
             dismissButton = { TextButton(onClick = { answering = null }) { Text("取消") } },
         )
     }
+}
+
+private fun ocrReviewReasonLabel(reason: String): String = when (reason) {
+    "low_confidence" -> "识别置信度偏低"
+    "sparse_text" -> "识别内容过少"
+    "multiple_questions" -> "图片包含多道题，请检查完整性"
+    "question_number_gap" -> "检测到题号缺失"
+    "subquestion_number_gap" -> "检测到小题编号缺失"
+    "model_detected_omission" -> "识别服务检测到内容可能缺失"
+    "model_structure_uncertain" -> "识别服务无法确认题目结构"
+    "content_safety_blocked" -> "内容需要管理员复核"
+    else -> "识别结果需要复核"
 }
 
 private fun reviewStageLabel(stage: String): String = when (stage) {

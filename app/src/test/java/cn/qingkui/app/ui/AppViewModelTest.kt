@@ -655,6 +655,7 @@ private fun mistakeWithStatus(status: String) = MistakeItem(
     ocrStatus = status,
     confidence = null,
     requiresReview = false,
+    reviewReasons = emptyList(),
     errorCategory = null,
     errorNote = null,
     analysisStatus = "not_started",

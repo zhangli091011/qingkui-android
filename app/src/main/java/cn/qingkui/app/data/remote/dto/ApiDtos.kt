@@ -398,6 +398,7 @@ data class OcrTaskDto(
     @SerializedName("result_text") val resultText: String? = null,
     val confidence: Double? = null,
     @SerializedName("requires_review") val requiresReview: Boolean = true,
+    @SerializedName("review_reasons") val reviewReasons: List<String> = emptyList(),
     @SerializedName("error_message") val errorMessage: String? = null,
 )
 

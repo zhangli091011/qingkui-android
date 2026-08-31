@@ -675,6 +675,7 @@ class NetworkAppRepository(
                 ocrErrorMessage = task?.errorMessage,
                 confidence = task?.confidence,
                 requiresReview = task?.requiresReview == true,
+                reviewReasons = task?.reviewReasons.orEmpty(),
                 errorCategory = mistake.errorCategory,
                 errorNote = mistake.errorNote,
                 analysisStatus = mistake.analysisStatus,
