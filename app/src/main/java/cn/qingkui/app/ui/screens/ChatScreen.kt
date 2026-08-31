@@ -44,6 +44,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -92,6 +93,7 @@ fun ChatScreen(
     onDismissClarification: () -> Unit,
     onAttach: () -> Unit,
     onFeedback: (Long, AnswerFeedbackAction) -> Unit,
+    onContentError: (Long, String) -> Unit,
     onRetry: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -110,6 +112,7 @@ fun ChatScreen(
                 compact = compact,
                 sending = sending,
                 onFeedback = onFeedback,
+                onContentError = onContentError,
                 onRetry = onRetry,
                 modifier = Modifier.weight(1f),
             )
@@ -183,6 +186,7 @@ private fun ConversationList(
     compact: Boolean,
     sending: Boolean,
     onFeedback: (Long, AnswerFeedbackAction) -> Unit,
+    onContentError: (Long, String) -> Unit,
     onRetry: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -206,6 +210,7 @@ private fun ConversationList(
             MessageRow(
                 message = message,
                 onFeedback = onFeedback,
+                onContentError = onContentError,
                 onRetry = onRetry,
             )
         }
@@ -224,8 +229,11 @@ private fun ConversationList(
 private fun MessageRow(
     message: ChatMessage,
     onFeedback: (Long, AnswerFeedbackAction) -> Unit,
+    onContentError: (Long, String) -> Unit,
     onRetry: (Long) -> Unit,
 ) {
+    var contentErrorDialog by remember { mutableStateOf(false) }
+    var contentErrorDetail by remember { mutableStateOf("") }
     val student = message.author == MessageAuthor.Student
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -279,12 +287,42 @@ private fun MessageRow(
                 ) {
                     InlineAction(Icons.Outlined.ThumbUp, "有帮助") { onFeedback(message.id, AnswerFeedbackAction.Helpful) }
                     InlineAction(Icons.Outlined.ThumbDown, "没帮助") { onFeedback(message.id, AnswerFeedbackAction.Unhelpful) }
-                    InlineAction(Icons.Outlined.Flag, "内容有误") { onFeedback(message.id, AnswerFeedbackAction.ContentError) }
+                    InlineAction(Icons.Outlined.Flag, "内容有误") {
+                        contentErrorDetail = ""
+                        contentErrorDialog = true
+                    }
                     InlineAction(Icons.Outlined.EventRepeat, "标记复习") { onFeedback(message.id, AnswerFeedbackAction.Review) }
                     InlineAction(Icons.Outlined.Refresh, "重新回答") { onRetry(message.id) }
                 }
             }
         }
+    }
+    if (contentErrorDialog) {
+        AlertDialog(
+            onDismissRequest = { contentErrorDialog = false },
+            title = { Text("指出回答问题") },
+            text = {
+                OutlinedTextField(
+                    value = contentErrorDetail,
+                    onValueChange = { contentErrorDetail = it.take(1000) },
+                    label = { Text("错误说明") },
+                    placeholder = { Text("例如：公式条件不完整") },
+                    minLines = 3,
+                    maxLines = 6,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = contentErrorDetail.trim().length >= 2,
+                    onClick = {
+                        onContentError(message.id, contentErrorDetail.trim())
+                        contentErrorDialog = false
+                    },
+                ) { Text("提交") }
+            },
+            dismissButton = { TextButton(onClick = { contentErrorDialog = false }) { Text("取消") } },
+        )
     }
 }
 

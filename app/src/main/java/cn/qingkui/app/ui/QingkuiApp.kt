@@ -167,6 +167,7 @@ fun QingkuiApp() {
                         onClarification = viewModel::selectQaClarification,
                         onDismissClarification = viewModel::dismissQaClarification,
                         onFeedback = viewModel::submitAnswerFeedback,
+                        onContentError = viewModel::submitContentErrorFeedback,
                         onRetry = viewModel::retryAnswer,
                         onAttach = viewModel::openMistakeCapture,
                     )

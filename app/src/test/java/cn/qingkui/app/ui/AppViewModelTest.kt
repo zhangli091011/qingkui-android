@@ -159,6 +159,29 @@ class AppViewModelTest {
     }
 
     @Test
+    fun detailedAnswerErrorIsAttachedToTheServerMessage() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository()
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+            viewModel.updateDraft("二次函数是什么？")
+            viewModel.sendMessage()
+            advanceUntilIdle()
+
+            val assistantId = viewModel.uiState.value.messages.last().id
+            viewModel.submitContentErrorFeedback(assistantId, "公式缺少定义域条件")
+            advanceUntilIdle()
+
+            assertEquals(listOf("message-2"), repository.answerFeedbackMessageIds)
+            assertEquals(listOf(AnswerFeedbackAction.ContentError), repository.answerFeedbackActions)
+            assertEquals(listOf("公式缺少定义域条件"), repository.answerFeedbackDetails)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun guestSendOpensAuthAndPreservesQuestion() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
@@ -437,6 +460,9 @@ private class FakeRepository(
     val redeemedCodes = mutableListOf<String>()
     val submittedContributionTitles = mutableListOf<String>()
     val requestedKnowledgeScopes = mutableListOf<KnowledgeCatalogScope>()
+    val answerFeedbackMessageIds = mutableListOf<String?>()
+    val answerFeedbackActions = mutableListOf<AnswerFeedbackAction>()
+    val answerFeedbackDetails = mutableListOf<String?>()
 
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null
@@ -545,13 +571,23 @@ private class FakeRepository(
         onDelta("回答")
         return QaAnswer(
             conversationId = "session-1",
-            message = ChatMessage(2L, MessageAuthor.Assistant, "二次函数回答", "二次函数 · 演示来源"),
+            message = ChatMessage(
+                id = 2L,
+                author = MessageAuthor.Assistant,
+                text = "二次函数回答",
+                source = "二次函数 · 演示来源",
+                serverId = "message-2",
+            ),
             balance = answerBalance,
             creditsCharged = helpLevel.creditCost,
         )
     }
 
-    override suspend fun submitAnswerFeedback(messageId: String?, action: AnswerFeedbackAction) = Unit
+    override suspend fun submitAnswerFeedback(messageId: String?, action: AnswerFeedbackAction, detail: String?) {
+        answerFeedbackMessageIds += messageId
+        answerFeedbackActions += action
+        answerFeedbackDetails += detail
+    }
     override fun observeMistakeDrafts(): Flow<List<MistakeDraftItem>> = flowOf(emptyList())
     override suspend fun mistakes(): List<MistakeItem> {
         mistakeCalls += 1

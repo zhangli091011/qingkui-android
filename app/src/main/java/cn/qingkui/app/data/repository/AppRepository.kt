@@ -158,7 +158,7 @@ interface AppRepository {
         helpLevel: QaHelpLevel,
         onDelta: (String) -> Unit,
     ): QaAnswer
-    suspend fun submitAnswerFeedback(messageId: String?, action: AnswerFeedbackAction)
+    suspend fun submitAnswerFeedback(messageId: String?, action: AnswerFeedbackAction, detail: String? = null)
     fun observeMistakeDrafts(): Flow<List<MistakeDraftItem>>
     suspend fun mistakes(): List<MistakeItem>
     suspend fun mistakeWeeklyReview(): MistakeWeeklyReview
@@ -594,8 +594,8 @@ class NetworkAppRepository(
         )
     }
 
-    override suspend fun submitAnswerFeedback(messageId: String?, action: AnswerFeedbackAction) = apiCall {
-        val (category, content) = when (action) {
+    override suspend fun submitAnswerFeedback(messageId: String?, action: AnswerFeedbackAction, detail: String?) = apiCall {
+        val (category, defaultContent) = when (action) {
             AnswerFeedbackAction.Helpful -> "other" to "该回答对本次学习有帮助"
             AnswerFeedbackAction.Unhelpful -> "answer_error" to "该回答没有解决我的问题"
             AnswerFeedbackAction.ContentError -> "answer_error" to "该回答可能存在内容错误，请人工审核"
@@ -604,7 +604,7 @@ class NetworkAppRepository(
         api.submitFeedback(
             FeedbackCreate(
                 category = category,
-                content = content,
+                content = detail?.trim()?.takeIf { it.isNotEmpty() }?.let { "$defaultContent：$it" } ?: defaultContent,
                 messageId = messageId,
             ),
         )

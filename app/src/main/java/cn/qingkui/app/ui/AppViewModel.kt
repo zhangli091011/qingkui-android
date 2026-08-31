@@ -884,10 +884,18 @@ class AppViewModel(
     }
 
     fun submitAnswerFeedback(messageId: Long, action: AnswerFeedbackAction) {
+        submitAnswerFeedback(messageId, action, null)
+    }
+
+    fun submitContentErrorFeedback(messageId: Long, detail: String) {
+        submitAnswerFeedback(messageId, AnswerFeedbackAction.ContentError, detail)
+    }
+
+    private fun submitAnswerFeedback(messageId: Long, action: AnswerFeedbackAction, detail: String?) {
         val message = _uiState.value.messages.firstOrNull { it.id == messageId } ?: return
         viewModelScope.launch {
             try {
-                repository.submitAnswerFeedback(message.serverId, action)
+                repository.submitAnswerFeedback(message.serverId, action, detail)
                 val notice = when (action) {
                     AnswerFeedbackAction.Helpful, AnswerFeedbackAction.Unhelpful -> "感谢反馈，我们会持续改进回答"
                     AnswerFeedbackAction.ContentError -> "已提交内容审核"
