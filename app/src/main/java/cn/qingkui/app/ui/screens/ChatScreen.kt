@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -30,6 +32,8 @@ import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.Icon
@@ -60,6 +64,7 @@ import cn.qingkui.app.R
 import cn.qingkui.app.ui.components.QkIconButton
 import cn.qingkui.app.ui.components.QkSvgAsset
 import cn.qingkui.app.ui.model.ChatMessage
+import cn.qingkui.app.ui.model.AnswerFeedbackAction
 import cn.qingkui.app.ui.model.MessageAuthor
 import cn.qingkui.app.ui.model.QaHelpLevel
 import cn.qingkui.app.ui.model.QaMode
@@ -86,7 +91,7 @@ fun ChatScreen(
     onClarification: (QaClarificationOption) -> Unit,
     onDismissClarification: () -> Unit,
     onAttach: () -> Unit,
-    onFeedback: (Long, Boolean) -> Unit,
+    onFeedback: (Long, AnswerFeedbackAction) -> Unit,
     onRetry: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -177,7 +182,7 @@ private fun ConversationList(
     messages: List<ChatMessage>,
     compact: Boolean,
     sending: Boolean,
-    onFeedback: (Long, Boolean) -> Unit,
+    onFeedback: (Long, AnswerFeedbackAction) -> Unit,
     onRetry: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -218,7 +223,7 @@ private fun ConversationList(
 @Composable
 private fun MessageRow(
     message: ChatMessage,
-    onFeedback: (Long, Boolean) -> Unit,
+    onFeedback: (Long, AnswerFeedbackAction) -> Unit,
     onRetry: (Long) -> Unit,
 ) {
     val student = message.author == MessageAuthor.Student
@@ -268,9 +273,14 @@ private fun MessageRow(
                     Text(message.source.orEmpty(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    InlineAction(Icons.Outlined.ThumbUp, "有帮助") { onFeedback(message.id, true) }
-                    InlineAction(Icons.Outlined.ThumbDown, "没帮助") { onFeedback(message.id, false) }
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    InlineAction(Icons.Outlined.ThumbUp, "有帮助") { onFeedback(message.id, AnswerFeedbackAction.Helpful) }
+                    InlineAction(Icons.Outlined.ThumbDown, "没帮助") { onFeedback(message.id, AnswerFeedbackAction.Unhelpful) }
+                    InlineAction(Icons.Outlined.Flag, "内容有误") { onFeedback(message.id, AnswerFeedbackAction.ContentError) }
+                    InlineAction(Icons.Outlined.EventRepeat, "标记复习") { onFeedback(message.id, AnswerFeedbackAction.Review) }
                     InlineAction(Icons.Outlined.Refresh, "重新回答") { onRetry(message.id) }
                 }
             }

@@ -8,6 +8,7 @@ import cn.qingkui.app.data.repository.ApiFailureException
 import cn.qingkui.app.data.repository.AppRepository
 import cn.qingkui.app.data.repository.AppRepositoryProvider
 import cn.qingkui.app.ui.model.AppDestination
+import cn.qingkui.app.ui.model.AnswerFeedbackAction
 import cn.qingkui.app.ui.model.AppUiState
 import cn.qingkui.app.ui.model.AuthMode
 import cn.qingkui.app.ui.model.ChatMessage
@@ -882,12 +883,22 @@ class AppViewModel(
         _uiState.update { it.copy(draft = question, errorMessage = null) }
     }
 
-    fun submitAnswerFeedback(messageId: Long, helpful: Boolean) {
+    fun submitAnswerFeedback(messageId: Long, action: AnswerFeedbackAction) {
         val message = _uiState.value.messages.firstOrNull { it.id == messageId } ?: return
         viewModelScope.launch {
             try {
-                repository.submitAnswerFeedback(message.serverId, helpful)
-                _uiState.update { it.copy(errorMessage = "感谢反馈，我们会持续改进回答") }
+                repository.submitAnswerFeedback(message.serverId, action)
+                val notice = when (action) {
+                    AnswerFeedbackAction.Helpful, AnswerFeedbackAction.Unhelpful -> "感谢反馈，我们会持续改进回答"
+                    AnswerFeedbackAction.ContentError -> "已提交内容审核"
+                    AnswerFeedbackAction.Review -> "已将关联知识点加入待复习"
+                }
+                if (action == AnswerFeedbackAction.Review) {
+                    val items = repository.learningItems(LearningFilter.Review)
+                    _uiState.update { it.copy(learningItems = items, errorMessage = notice) }
+                } else {
+                    _uiState.update { it.copy(errorMessage = notice) }
+                }
             } catch (error: Exception) {
                 handleApiError(error) { it }
             }

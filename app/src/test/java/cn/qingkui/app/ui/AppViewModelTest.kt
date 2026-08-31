@@ -6,6 +6,7 @@ import cn.qingkui.app.data.repository.MistakeAnalysisOutcome
 import cn.qingkui.app.data.repository.QaAnswer
 import cn.qingkui.app.data.repository.UnderstandingCheckOutcome
 import cn.qingkui.app.ui.model.AppDestination
+import cn.qingkui.app.ui.model.AnswerFeedbackAction
 import cn.qingkui.app.ui.model.ChatMessage
 import cn.qingkui.app.ui.model.CreditLedgerItem
 import cn.qingkui.app.ui.model.DeviceSessionItem
@@ -550,7 +551,7 @@ private class FakeRepository(
         )
     }
 
-    override suspend fun submitAnswerFeedback(messageId: String?, helpful: Boolean) = Unit
+    override suspend fun submitAnswerFeedback(messageId: String?, action: AnswerFeedbackAction) = Unit
     override fun observeMistakeDrafts(): Flow<List<MistakeDraftItem>> = flowOf(emptyList())
     override suspend fun mistakes(): List<MistakeItem> {
         mistakeCalls += 1

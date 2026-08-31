@@ -11,6 +11,13 @@ enum class AppDestination(val label: String) {
 
 enum class MessageAuthor { Student, Assistant }
 
+enum class AnswerFeedbackAction {
+    Helpful,
+    Unhelpful,
+    ContentError,
+    Review,
+}
+
 enum class QaHelpLevel(val label: String, val apiValue: String, val creditCost: Int) {
     Keyword("关键词", "keyword", 1),
     NextStep("下一步", "next_step", 1),

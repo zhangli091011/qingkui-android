@@ -36,6 +36,7 @@ import cn.qingkui.app.data.remote.dto.PasswordResetConfirm
 import cn.qingkui.app.data.remote.dto.QaIntentRequest
 import cn.qingkui.app.data.work.MistakeUploadWorker
 import cn.qingkui.app.ui.model.ChatMessage
+import cn.qingkui.app.ui.model.AnswerFeedbackAction
 import cn.qingkui.app.ui.model.ConversationSummary
 import cn.qingkui.app.ui.model.CreditLedgerItem
 import cn.qingkui.app.ui.model.DeviceSessionItem
@@ -157,7 +158,7 @@ interface AppRepository {
         helpLevel: QaHelpLevel,
         onDelta: (String) -> Unit,
     ): QaAnswer
-    suspend fun submitAnswerFeedback(messageId: String?, helpful: Boolean)
+    suspend fun submitAnswerFeedback(messageId: String?, action: AnswerFeedbackAction)
     fun observeMistakeDrafts(): Flow<List<MistakeDraftItem>>
     suspend fun mistakes(): List<MistakeItem>
     suspend fun mistakeWeeklyReview(): MistakeWeeklyReview
@@ -593,11 +594,17 @@ class NetworkAppRepository(
         )
     }
 
-    override suspend fun submitAnswerFeedback(messageId: String?, helpful: Boolean) = apiCall {
+    override suspend fun submitAnswerFeedback(messageId: String?, action: AnswerFeedbackAction) = apiCall {
+        val (category, content) = when (action) {
+            AnswerFeedbackAction.Helpful -> "other" to "该回答对本次学习有帮助"
+            AnswerFeedbackAction.Unhelpful -> "answer_error" to "该回答没有解决我的问题"
+            AnswerFeedbackAction.ContentError -> "answer_error" to "该回答可能存在内容错误，请人工审核"
+            AnswerFeedbackAction.Review -> "review_request" to "将回答关联知识点加入待复习"
+        }
         api.submitFeedback(
             FeedbackCreate(
-                category = if (helpful) "other" else "answer_error",
-                content = if (helpful) "该回答对本次学习有帮助" else "该回答没有解决我的问题",
+                category = category,
+                content = content,
                 messageId = messageId,
             ),
         )

@@ -286,6 +286,7 @@ data class FeedbackCreate(
     val category: String,
     val content: String,
     @SerializedName("message_id") val messageId: String?,
+    @SerializedName("node_id") val nodeId: String? = null,
 )
 
 data class FeedbackDto(
