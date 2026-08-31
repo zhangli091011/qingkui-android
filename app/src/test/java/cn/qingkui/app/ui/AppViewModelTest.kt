@@ -5,6 +5,7 @@ import cn.qingkui.app.data.repository.AppRepository
 import cn.qingkui.app.data.repository.GraphData
 import cn.qingkui.app.data.repository.MistakeAnalysisOutcome
 import cn.qingkui.app.data.repository.QaAnswer
+import cn.qingkui.app.data.repository.ServiceAvailability
 import cn.qingkui.app.data.repository.UnderstandingCheckOutcome
 import cn.qingkui.app.ui.model.AppDestination
 import cn.qingkui.app.ui.model.AnswerFeedbackAction
@@ -348,6 +349,28 @@ class AppViewModelTest {
     }
 
     @Test
+    fun unavailableAiDisablesQuestionAndMistakeAnalysisBeforeNetworkCall() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository(aiAvailable = false)
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+            viewModel.updateDraft("什么是二次函数？")
+
+            viewModel.sendMessage()
+            viewModel.analyzeMistake("mistake-1")
+            advanceUntilIdle()
+
+            assertEquals(false, viewModel.uiState.value.aiAvailable)
+            assertEquals(0, repository.questionsSent)
+            assertTrue(repository.analyzedMistakes.isEmpty())
+            assertTrue(viewModel.uiState.value.errorMessage?.contains("维护") == true)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun blankQuestionDoesNotCallBackend() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
@@ -677,6 +700,7 @@ private class FakeRepository(
     private var privacyRequired: Boolean = false,
     private val streamGates: MutableList<CompletableDeferred<Unit>> = mutableListOf(),
     private val clarificationGate: CompletableDeferred<Unit>? = null,
+    private val aiAvailable: Boolean = true,
 ) : AppRepository {
     var privacyAccepted = false
     var questionsSent = 0
@@ -703,6 +727,11 @@ private class FakeRepository(
     val answerFeedbackActions = mutableListOf<AnswerFeedbackAction>()
     val answerFeedbackDetails = mutableListOf<String?>()
     val nodeStateUpdates = mutableListOf<NodeStateCall>()
+
+    override suspend fun serviceAvailability() = ServiceAvailability(
+        aiAvailable = aiAvailable,
+        message = if (aiAvailable) null else "AI 服务维护中，浏览和已有学习记录仍可使用",
+    )
 
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null

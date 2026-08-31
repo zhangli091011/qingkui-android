@@ -71,6 +71,7 @@ fun LearningScreen(
     mistakes: List<MistakeItem>,
     showMistakes: Boolean,
     mistakeLoading: Boolean,
+    aiAvailable: Boolean?,
     weeklyReview: MistakeWeeklyReview?,
     onOpenItem: (String) -> Unit,
     onShowLearning: () -> Unit,
@@ -114,6 +115,7 @@ fun LearningScreen(
                     drafts = mistakeDrafts,
                     mistakes = mistakes,
                     loading = mistakeLoading,
+                    aiAvailable = aiAvailable,
                     weeklyReview = weeklyReview,
                     onCapture = onCaptureMistake,
                     onRefresh = onRefreshMistakes,
@@ -227,6 +229,7 @@ private fun MistakeBookContent(
     drafts: List<MistakeDraftItem>,
     mistakes: List<MistakeItem>,
     loading: Boolean,
+    aiAvailable: Boolean?,
     weeklyReview: MistakeWeeklyReview?,
     onCapture: () -> Unit,
     onRefresh: () -> Unit,
@@ -400,7 +403,7 @@ private fun MistakeBookContent(
                         )
                     }
                     Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = { onAskMistake(item) }) { Text("带入 AI 继续追问") }
+                    TextButton(onClick = { onAskMistake(item) }, enabled = aiAvailable != false) { Text("带入 AI 继续追问") }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (item.confidence != null) Text("置信度 ${(item.confidence * 100).toInt()}%", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (item.requiresReview && item.ocrTaskId != null && item.ocrStatus == "succeeded") {
@@ -413,16 +416,16 @@ private fun MistakeBookContent(
                             TextButton(onClick = { onRetryOcr(item.id, item.ocrTaskId) }) { Text("重试识别") }
                         }
                         if (!item.requiresReview && item.analysisStatus != "completed") {
-                            TextButton(onClick = { onAnalyze(item.id) }, enabled = !loading) { Text("分析错因") }
+                            TextButton(onClick = { onAnalyze(item.id) }, enabled = !loading && aiAvailable != false) { Text("分析错因") }
                         }
                         if (item.analysisStatus == "completed" && item.practices.isEmpty()) {
-                            TextButton(onClick = { onGeneratePractice(item.id) }, enabled = !loading) { Text("生成同类练习") }
+                            TextButton(onClick = { onGeneratePractice(item.id) }, enabled = !loading && aiAvailable != false) { Text("生成同类练习") }
                         }
                         if (
                             item.analysisStatus == "completed" && item.practices.isNotEmpty() &&
                             item.practices.none { it.status == "pending" } && item.studyStatus != "mastered"
                         ) {
-                            TextButton(onClick = { onGeneratePractice(item.id) }, enabled = !loading) { Text("开始下一轮") }
+                            TextButton(onClick = { onGeneratePractice(item.id) }, enabled = !loading && aiAvailable != false) { Text("开始下一轮") }
                         }
                     }
                     if (item.requiresReview && item.reviewReasons.isNotEmpty()) {

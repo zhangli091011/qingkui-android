@@ -80,6 +80,8 @@ fun ChatScreen(
     messages: List<ChatMessage>,
     credits: Int,
     sending: Boolean,
+    aiAvailable: Boolean?,
+    aiUnavailableMessage: String?,
     authenticated: Boolean,
     subject: String,
     helpLevel: QaHelpLevel,
@@ -123,6 +125,8 @@ fun ChatScreen(
             draft = draft,
             credits = credits,
             sending = sending,
+            aiAvailable = aiAvailable,
+            aiUnavailableMessage = aiUnavailableMessage,
             authenticated = authenticated,
             subject = subject,
             helpLevel = helpLevel,
@@ -346,6 +350,8 @@ private fun PromptComposer(
     draft: String,
     credits: Int,
     sending: Boolean,
+    aiAvailable: Boolean?,
+    aiUnavailableMessage: String?,
     authenticated: Boolean,
     subject: String,
     helpLevel: QaHelpLevel,
@@ -360,7 +366,7 @@ private fun PromptComposer(
     val focusManager = LocalFocusManager.current
     var helpMenuOpen by remember { mutableStateOf(false) }
     val hasCredits = !authenticated || credits >= helpLevel.creditCost
-    val enabled = sending || (draft.isNotBlank() && hasCredits)
+    val enabled = sending || (draft.isNotBlank() && hasCredits && aiAvailable != false)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -466,7 +472,9 @@ private fun PromptComposer(
                 )
             }
             Text(
-                text = if (!authenticated) {
+                text = if (aiAvailable == false) {
+                    aiUnavailableMessage ?: "AI 服务暂时不可用"
+                } else if (!authenticated) {
                     "登录后发送并同步问答与学习记录"
                 } else if (!hasCredits) {
                     "当前额度不足，${helpLevel.label}需要 ${helpLevel.creditCost} 额度"
@@ -477,7 +485,7 @@ private fun PromptComposer(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodySmall,
-                color = if (authenticated && !hasCredits) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (aiAvailable == false || (authenticated && !hasCredits)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
         }

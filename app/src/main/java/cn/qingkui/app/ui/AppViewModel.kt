@@ -87,6 +87,7 @@ class AppViewModel(
                 restorePersistedConversation()
             }
         }
+        viewModelScope.launch { refreshServiceAvailability() }
     }
 
     private fun restorePersistedConversation() {
@@ -170,8 +171,21 @@ class AppViewModel(
 
     fun refreshContent() {
         viewModelScope.launch {
+            refreshServiceAvailability()
             refreshContentNow()
         }
+    }
+
+    private suspend fun refreshServiceAvailability() {
+        runCatching { repository.serviceAvailability() }
+            .onSuccess { availability ->
+                _uiState.update {
+                    it.copy(
+                        aiAvailable = availability.aiAvailable,
+                        aiUnavailableMessage = availability.message,
+                    )
+                }
+            }
     }
 
     private suspend fun refreshContentNow() {
@@ -570,6 +584,10 @@ class AppViewModel(
     }
 
     fun analyzeMistake(mistakeId: String) {
+        if (_uiState.value.aiAvailable == false) {
+            _uiState.update { it.copy(errorMessage = it.aiUnavailableMessage ?: "AI 服务暂时不可用") }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(mistakeLoading = true, errorMessage = null) }
             try {
@@ -585,6 +603,10 @@ class AppViewModel(
     }
 
     fun generateMistakePractice(mistakeId: String) {
+        if (_uiState.value.aiAvailable == false) {
+            _uiState.update { it.copy(errorMessage = it.aiUnavailableMessage ?: "AI 服务暂时不可用") }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(mistakeLoading = true, errorMessage = null) }
             try {
@@ -633,6 +655,10 @@ class AppViewModel(
         val state = _uiState.value
         val question = state.draft.trim()
         if (question.isEmpty() || state.sending) return
+        if (state.aiAvailable == false) {
+            _uiState.update { it.copy(errorMessage = state.aiUnavailableMessage ?: "AI 服务暂时不可用") }
+            return
+        }
         if (!state.authenticated) {
             _uiState.update {
                 it.copy(authScreenOpen = true, pendingSendAfterAuth = true, errorMessage = null)

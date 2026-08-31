@@ -54,6 +54,9 @@ import cn.qingkui.app.data.remote.dto.OcrTaskDto
 import cn.qingkui.app.data.remote.dto.PracticeSubmitDto
 
 interface QingkuiApi {
+    @GET("../health")
+    suspend fun health(): cn.qingkui.app.data.remote.dto.HealthDto
+
     @POST("auth/register")
     suspend fun register(@Body body: RegisterRequest): AuthResponse
 

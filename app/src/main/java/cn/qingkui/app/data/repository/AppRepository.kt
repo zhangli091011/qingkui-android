@@ -109,10 +109,12 @@ data class QaAnswer(
 data class MistakeAnalysisOutcome(val balance: Int)
 data class UnderstandingCheckOutcome(val passed: Boolean, val status: KnowledgeStatus)
 data class CreditRedeemOutcome(val campaignName: String, val amount: Int, val balance: Int)
+data class ServiceAvailability(val aiAvailable: Boolean, val message: String? = null)
 
 class ApiFailureException(val statusCode: Int?, message: String) : Exception(message)
 
 interface AppRepository {
+    suspend fun serviceAvailability(): ServiceAvailability = ServiceAvailability(aiAvailable = true)
     suspend fun hasSession(): Boolean
     suspend fun nickname(): String?
     suspend fun login(username: String, password: String): String
@@ -193,6 +195,15 @@ class NetworkAppRepository(
 ) : AppRepository {
     private val gson = Gson()
     private val draftDao = MistakeDatabase.get(context).drafts()
+
+    override suspend fun serviceAvailability(): ServiceAvailability = apiCall {
+        val health = api.health()
+        val available = health.aiEnabled && health.aiReady
+        ServiceAvailability(
+            aiAvailable = available,
+            message = if (available) null else "AI 服务维护中，浏览和已有学习记录仍可使用",
+        )
+    }
 
     override suspend fun hasSession(): Boolean = tokenStore.refreshToken() != null
     override suspend fun nickname(): String? = tokenStore.nickname()

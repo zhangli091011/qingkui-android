@@ -168,6 +168,8 @@ fun QingkuiApp() {
                         messages = uiState.messages,
                         credits = uiState.credits,
                         sending = uiState.sending,
+                        aiAvailable = uiState.aiAvailable,
+                        aiUnavailableMessage = uiState.aiUnavailableMessage,
                         authenticated = uiState.authenticated,
                         subject = uiState.currentSubject,
                         helpLevel = uiState.helpLevel,
@@ -216,6 +218,7 @@ fun QingkuiApp() {
                         mistakes = uiState.mistakes,
                         showMistakes = uiState.learningShowsMistakes,
                         mistakeLoading = uiState.mistakeLoading,
+                        aiAvailable = uiState.aiAvailable,
                         weeklyReview = uiState.mistakeWeeklyReview,
                         onOpenItem = { nodeId ->
                             viewModel.selectNode(nodeId)

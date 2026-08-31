@@ -56,6 +56,12 @@ data class AuthResponse(
 
 data class CreditDto(val balance: Int)
 
+data class HealthDto(
+    val status: String,
+    @SerializedName("ai_enabled") val aiEnabled: Boolean,
+    @SerializedName("ai_ready") val aiReady: Boolean,
+)
+
 data class CreditCampaignDto(
     val id: String,
     val name: String,

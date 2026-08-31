@@ -390,6 +390,8 @@ data class AppUiState(
     val currentUserName: String = "青葵同学",
     val authLoading: Boolean = false,
     val contentLoading: Boolean = false,
+    val aiAvailable: Boolean? = null,
+    val aiUnavailableMessage: String? = null,
     val sending: Boolean = false,
     val qaClarification: QaClarification? = null,
     val helpLevel: QaHelpLevel = QaHelpLevel.Approach,
