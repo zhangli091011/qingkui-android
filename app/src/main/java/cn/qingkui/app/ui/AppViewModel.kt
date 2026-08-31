@@ -358,11 +358,7 @@ class AppViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(mistakeLoading = true) }
             try {
-                val (items, weeklyReview) = coroutineScope {
-                    val itemsRequest = async { repository.mistakes() }
-                    val reviewRequest = async { repository.mistakeWeeklyReview() }
-                    itemsRequest.await() to reviewRequest.await()
-                }
+                val (items, weeklyReview) = loadMistakeSnapshot()
                 _uiState.update {
                     it.copy(mistakes = items, mistakeWeeklyReview = weeklyReview, mistakeLoading = false)
                 }
@@ -372,6 +368,13 @@ class AppViewModel(
             }
         }
     }
+
+    private suspend fun loadMistakeSnapshot(): Pair<List<cn.qingkui.app.ui.model.MistakeItem>, cn.qingkui.app.ui.model.MistakeWeeklyReview> =
+        coroutineScope {
+            val itemsRequest = async { repository.mistakes() }
+            val reviewRequest = async { repository.mistakeWeeklyReview() }
+            itemsRequest.await() to reviewRequest.await()
+        }
 
     private fun reconcileMistakePolling(items: List<cn.qingkui.app.ui.model.MistakeItem>) {
         val state = _uiState.value
@@ -476,7 +479,8 @@ class AppViewModel(
         viewModelScope.launch {
             try {
                 repository.deleteMistake(mistakeId)
-                _uiState.update { state -> state.copy(mistakes = state.mistakes.filterNot { it.id == mistakeId }) }
+                val (items, weeklyReview) = loadMistakeSnapshot()
+                _uiState.update { state -> state.copy(mistakes = items, mistakeWeeklyReview = weeklyReview) }
             } catch (error: Exception) {
                 handleApiError(error) { it }
             }
@@ -488,9 +492,9 @@ class AppViewModel(
             _uiState.update { it.copy(mistakeLoading = true, errorMessage = null) }
             try {
                 val outcome = repository.analyzeMistake(mistakeId)
-                val items = repository.mistakes()
+                val (items, weeklyReview) = loadMistakeSnapshot()
                 _uiState.update {
-                    it.copy(credits = outcome.balance, mistakes = items, mistakeLoading = false)
+                    it.copy(credits = outcome.balance, mistakes = items, mistakeWeeklyReview = weeklyReview, mistakeLoading = false)
                 }
             } catch (error: Exception) {
                 handleApiError(error) { it.copy(mistakeLoading = false) }
@@ -503,8 +507,8 @@ class AppViewModel(
             _uiState.update { it.copy(mistakeLoading = true, errorMessage = null) }
             try {
                 repository.generateMistakePractice(mistakeId)
-                val items = repository.mistakes()
-                _uiState.update { it.copy(mistakes = items, mistakeLoading = false) }
+                val (items, weeklyReview) = loadMistakeSnapshot()
+                _uiState.update { it.copy(mistakes = items, mistakeWeeklyReview = weeklyReview, mistakeLoading = false) }
             } catch (error: Exception) {
                 handleApiError(error) { it.copy(mistakeLoading = false) }
             }
@@ -517,8 +521,8 @@ class AppViewModel(
             _uiState.update { it.copy(mistakeLoading = true, errorMessage = null) }
             try {
                 repository.submitMistakePractice(mistakeId, practiceId, answer)
-                val items = repository.mistakes()
-                _uiState.update { it.copy(mistakes = items, mistakeLoading = false) }
+                val (items, weeklyReview) = loadMistakeSnapshot()
+                _uiState.update { it.copy(mistakes = items, mistakeWeeklyReview = weeklyReview, mistakeLoading = false) }
             } catch (error: Exception) {
                 handleApiError(error) { it.copy(mistakeLoading = false) }
             }

@@ -312,12 +312,20 @@ data class WeeklyMistakeLinkItem(
 )
 
 @Immutable
+data class WeakKnowledgePointItem(
+    val knowledgeNodeId: String,
+    val name: String,
+    val mistakeCount: Int,
+)
+
+@Immutable
 data class MistakeWeeklyReview(
     val weekStart: String,
     val weekEnd: String,
     val newMistakes: Int,
     val dueReviewCount: Int,
     val topErrorCategory: String?,
+    val weakKnowledgePoints: List<WeakKnowledgePointItem> = emptyList(),
     val practiceCompletionRate: Double,
     val authoritativeAccuracy: Double,
     val secondAttemptAccuracy: Double,

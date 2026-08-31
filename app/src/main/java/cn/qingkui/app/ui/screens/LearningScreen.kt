@@ -124,6 +124,7 @@ fun LearningScreen(
                     onAnalyze = onAnalyzeMistake,
                     onGeneratePractice = onGeneratePractice,
                     onSubmitPractice = onSubmitPractice,
+                    onOpenKnowledgeNode = onOpenItem,
                 )
             } else {
                 LearningFilters(selectedFilter = selectedFilter, onFilterChange = onFilterChange)
@@ -235,6 +236,7 @@ private fun MistakeBookContent(
     onAnalyze: (String) -> Unit,
     onGeneratePractice: (String) -> Unit,
     onSubmitPractice: (String, String, String) -> Unit,
+    onOpenKnowledgeNode: (String) -> Unit,
 ) {
     var editing by remember { mutableStateOf<MistakeItem?>(null) }
     var mistakeToDelete by remember { mutableStateOf<MistakeItem?>(null) }
@@ -277,15 +279,43 @@ private fun MistakeBookContent(
             if (report.dueReviews.isNotEmpty()) {
                 Text("待复习入口", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 report.dueReviews.take(5).forEach { link ->
+                    val linkedMistake = mistakes.firstOrNull { it.id == link.mistakeId }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(
+                            onClick = { focusedMistakeId = link.mistakeId },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(
+                                "${link.title} · ${reviewStageLabel(link.reviewStage)}",
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            )
+                        }
+                        if (linkedMistake != null) {
+                            val nextPractice = linkedMistake.practices.firstOrNull { it.status == "pending" }
+                            if (nextPractice != null) {
+                                TextButton(onClick = {
+                                    focusedMistakeId = link.mistakeId
+                                    answering = linkedMistake to nextPractice
+                                    practiceAnswer = ""
+                                    showPracticeHint = false
+                                }) { Text("开始复习") }
+                            }
+                        }
+                    }
+                }
+            }
+            if (report.weakKnowledgePoints.isNotEmpty()) {
+                Text("薄弱知识点", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                report.weakKnowledgePoints.take(5).forEach { point ->
                     TextButton(
-                        onClick = { focusedMistakeId = link.mistakeId },
+                        onClick = { onOpenKnowledgeNode(point.knowledgeNodeId) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(
-                            "${link.title} · ${reviewStageLabel(link.reviewStage)}",
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        )
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(point.name, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Text("${point.mistakeCount} 题", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }

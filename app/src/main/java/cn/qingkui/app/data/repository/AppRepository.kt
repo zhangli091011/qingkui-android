@@ -675,6 +675,13 @@ class NetworkAppRepository(
             newMistakes = report.newMistakes,
             dueReviewCount = report.dueReviews.size,
             topErrorCategory = report.errorCategories.maxByOrNull { it.value }?.key,
+            weakKnowledgePoints = report.weakKnowledgePoints.map {
+                cn.qingkui.app.ui.model.WeakKnowledgePointItem(
+                    knowledgeNodeId = it.knowledgeNodeId,
+                    name = it.name,
+                    mistakeCount = it.mistakeCount,
+                )
+            },
             practiceCompletionRate = report.practiceCompletionRate,
             authoritativeAccuracy = report.authoritativeAccuracy,
             secondAttemptAccuracy = report.secondAttemptAccuracy,

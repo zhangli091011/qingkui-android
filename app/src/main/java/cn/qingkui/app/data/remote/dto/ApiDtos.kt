@@ -450,11 +450,18 @@ data class WeeklyMistakeLinkDto(
     @SerializedName("next_review_at") val nextReviewAt: String? = null,
 )
 
+data class WeakKnowledgePointDto(
+    @SerializedName("knowledge_node_id") val knowledgeNodeId: String,
+    val name: String,
+    @SerializedName("mistake_count") val mistakeCount: Int,
+)
+
 data class MistakeWeeklyReviewDto(
     @SerializedName("week_start") val weekStart: String,
     @SerializedName("week_end") val weekEnd: String,
     @SerializedName("new_mistakes") val newMistakes: Int,
     @SerializedName("error_categories") val errorCategories: Map<String, Int> = emptyMap(),
+    @SerializedName("weak_knowledge_points") val weakKnowledgePoints: List<WeakKnowledgePointDto> = emptyList(),
     @SerializedName("due_reviews") val dueReviews: List<WeeklyMistakeLinkDto> = emptyList(),
     @SerializedName("practice_completion_rate") val practiceCompletionRate: Double,
     @SerializedName("authoritative_accuracy") val authoritativeAccuracy: Double,
