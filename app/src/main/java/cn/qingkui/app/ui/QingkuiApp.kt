@@ -1,6 +1,7 @@
 package cn.qingkui.app.ui
 
 import androidx.compose.foundation.background
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -53,6 +54,16 @@ fun QingkuiApp() {
     val darkTheme = isSystemInDarkTheme()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val snackbarHostState = remember { SnackbarHostState() }
+
+    BackHandler(
+        enabled = uiState.authScreenOpen || uiState.drawerOpen || uiState.destination != AppDestination.Chat,
+    ) {
+        when {
+            uiState.authScreenOpen -> viewModel.closeAuth()
+            uiState.drawerOpen -> viewModel.setDrawerOpen(false)
+            else -> viewModel.selectDestination(AppDestination.Chat)
+        }
+    }
 
     if (uiState.authChecking) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {

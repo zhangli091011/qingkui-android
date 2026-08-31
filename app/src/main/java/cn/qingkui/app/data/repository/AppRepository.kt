@@ -361,10 +361,13 @@ class NetworkAppRepository(
         val response = api.neighbors(centerId)
         val center = response.center.toUi(.5f, .5f)
         val neighbors = response.nodes.mapIndexed { index, node ->
-            val angle = (2.0 * Math.PI * index / response.nodes.size.coerceAtLeast(1)) - Math.PI / 2
+            val (ring, positionInRing) = graphRingPosition(index)
+            val capacity = graphRingCapacity(ring)
+            val angle = (2.0 * Math.PI * positionInRing / capacity) - Math.PI / 2
+            val radius = (.15 + ring * .105).coerceAtMost(.45)
             node.toUi(
-                x = (.5 + .34 * cos(angle)).toFloat(),
-                y = (.5 + .34 * sin(angle)).toFloat(),
+                x = (.5 + radius * cos(angle)).toFloat(),
+                y = (.5 + radius * sin(angle)).toFloat(),
             )
         }
         GraphData(
@@ -856,6 +859,7 @@ class NetworkAppRepository(
         source = KnowledgeSource.Official,
         description = definition,
         evidence = "$subject · $grade · $chapter",
+        saved = isFavorite,
     )
 
     private fun KnowledgeNodeDetailDto.toUiNode(x: Float, y: Float) = KnowledgeNode(
@@ -869,6 +873,8 @@ class NetworkAppRepository(
         source = KnowledgeSource.Official,
         description = if (explanation.isBlank()) definition else explanation,
         evidence = "$subject · $grade · $chapter",
+        saved = isFavorite,
+        note = note.orEmpty(),
     )
 
     private fun NeighborNodeDto.toUi(x: Float, y: Float) = KnowledgeNode(
@@ -882,6 +888,7 @@ class NetworkAppRepository(
         source = KnowledgeSource.Official,
         description = definition,
         evidence = "$subject · $grade · $chapter",
+        saved = isFavorite,
     )
 
     private fun cn.qingkui.app.data.remote.dto.SchoolClassDto.toSchoolClassItem() = SchoolClassItem(
@@ -942,4 +949,16 @@ object AppRepositoryProvider {
             NetworkAppRepository(NetworkModule.create(tokenStore), tokenStore, context.applicationContext).also { instance = it }
         }
     }
+}
+
+private fun graphRingCapacity(ring: Int): Int = 8 + ring * 6
+
+private fun graphRingPosition(index: Int): Pair<Int, Int> {
+    var ring = 0
+    var position = index
+    while (position >= graphRingCapacity(ring)) {
+        position -= graphRingCapacity(ring)
+        ring++
+    }
+    return ring to position
 }

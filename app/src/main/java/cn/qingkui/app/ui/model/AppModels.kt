@@ -99,6 +99,7 @@ data class KnowledgeNode(
     val description: String = "",
     val evidence: String = "校本知识库 · 高一数学",
     val saved: Boolean = false,
+    val note: String = "",
 )
 
 @Immutable

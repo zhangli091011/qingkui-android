@@ -58,6 +58,7 @@ import cn.qingkui.app.ui.model.MistakeDraftItem
 import cn.qingkui.app.ui.model.MistakeItem
 import cn.qingkui.app.ui.model.MistakePracticeItem
 import cn.qingkui.app.ui.model.MistakeWeeklyReview
+import cn.qingkui.app.ui.components.MathRichText
 import coil.compose.AsyncImage
 import java.io.File
 
@@ -390,7 +391,7 @@ private fun MistakeBookContent(
                         }
                     }
                     Spacer(Modifier.height(6.dp))
-                    Text(item.questionText, style = MaterialTheme.typography.bodyLarge, maxLines = 5)
+                    MathRichText(item.questionText, style = MaterialTheme.typography.bodyLarge)
                     if (item.ocrStatus == "blocked") {
                         Text(
                             item.ocrErrorMessage ?: "识别内容已被安全隔离，可删除图片或联系管理员复核。",
@@ -435,12 +436,12 @@ private fun MistakeBookContent(
                     if (!item.analysisDiagnosis.isNullOrBlank()) {
                         Spacer(Modifier.height(8.dp))
                         Text("错因分析", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                        Text(item.analysisDiagnosis, style = MaterialTheme.typography.bodyMedium)
+                        MathRichText(item.analysisDiagnosis, style = MaterialTheme.typography.bodyMedium)
                         if (!item.errorNote.isNullOrBlank()) {
                             Text(item.errorNote, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         item.correctionSteps.forEachIndexed { index, step ->
-                            Text("${index + 1}. $step", style = MaterialTheme.typography.bodySmall)
+                            MathRichText("${index + 1}. $step", style = MaterialTheme.typography.bodySmall)
                         }
                         if (!item.knowledgeNodeId.isNullOrBlank()) {
                             Text("关联知识点：${item.knowledgeNodeId}（待确认）", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -456,7 +457,7 @@ private fun MistakeBookContent(
                     visiblePractices.forEach { practice ->
                         Spacer(Modifier.height(10.dp))
                         Text("第 ${practice.position ?: 1} 题", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(practice.questionText, style = MaterialTheme.typography.bodyMedium)
+                        MathRichText(practice.questionText, style = MaterialTheme.typography.bodyMedium)
                         if (practice.status == "pending") {
                             TextButton(onClick = {
                                 answering = item to practice
@@ -470,7 +471,11 @@ private fun MistakeBookContent(
                                 color = if (practice.isCorrect == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                             )
                             if (!practice.answerReference.isNullOrBlank()) {
-                                Text("参考：${practice.answerReference}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                MathRichText(
+                                    "参考：${practice.answerReference}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
                     }
@@ -535,13 +540,17 @@ private fun MistakeBookContent(
             title = { Text("同类练习") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(practice.questionText, style = MaterialTheme.typography.bodyMedium)
+                    MathRichText(practice.questionText, style = MaterialTheme.typography.bodyMedium)
                     if (!practice.hint.isNullOrBlank()) {
                         TextButton(onClick = { showPracticeHint = !showPracticeHint }) {
                             Text(if (showPracticeHint) "收起提示" else "查看提示")
                         }
                         if (showPracticeHint) {
-                            Text(practice.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            MathRichText(
+                                practice.hint,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                     OutlinedTextField(

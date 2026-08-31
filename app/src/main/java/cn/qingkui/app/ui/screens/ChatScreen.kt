@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.sp
 import cn.qingkui.app.R
 import cn.qingkui.app.ui.components.QkIconButton
 import cn.qingkui.app.ui.components.QkSvgAsset
+import cn.qingkui.app.ui.components.MathRichText
 import cn.qingkui.app.ui.model.ChatMessage
 import cn.qingkui.app.ui.model.AnswerFeedbackAction
 import cn.qingkui.app.ui.model.MessageAuthor
@@ -256,7 +257,7 @@ private fun MessageRow(
                     )
                     .padding(if (student) 16.dp else 0.dp),
             ) {
-                Text(message.text, style = MaterialTheme.typography.bodyLarge)
+                MathRichText(message.text, style = MaterialTheme.typography.bodyLarge)
             }
             if (!student && (message.citations.isNotEmpty() || message.source != null)) {
                 Spacer(Modifier.height(12.dp))
@@ -273,7 +274,11 @@ private fun MessageRow(
                             Text("${citation.nodeName} · ${citation.sourceTitle}", style = MaterialTheme.typography.bodySmall)
                             Text(citation.sourceLocation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (citation.excerpt.isNotBlank()) {
-                                Text(citation.excerpt, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                                MathRichText(
+                                    citation.excerpt,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
                     }

@@ -157,6 +157,7 @@ data class KnowledgeNodeDto(
     val section: String = "本章知识点",
     val definition: String,
     val status: String,
+    @SerializedName("is_favorite") val isFavorite: Boolean = false,
 )
 
 data class KnowledgeCatalogItemDto(
@@ -183,6 +184,7 @@ data class NeighborNodeDto(
     val chapter: String,
     val definition: String,
     val status: String,
+    @SerializedName("is_favorite") val isFavorite: Boolean = false,
     @SerializedName("edge_type") val edgeType: String,
     @SerializedName("edge_explanation") val edgeExplanation: String,
 )
@@ -240,6 +242,8 @@ data class KnowledgeNodeDetailDto(
     @SerializedName("common_errors") val commonErrors: List<String> = emptyList(),
     @SerializedName("question_types") val questionTypes: List<String> = emptyList(),
     @SerializedName("source_excerpt") val sourceExcerpt: String = "",
+    val note: String? = null,
+    @SerializedName("is_favorite") val isFavorite: Boolean = false,
 )
 
 data class KnowledgeStateUpdate(

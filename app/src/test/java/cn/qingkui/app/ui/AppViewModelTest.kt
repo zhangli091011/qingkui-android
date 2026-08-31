@@ -1,5 +1,6 @@
 package cn.qingkui.app.ui
 
+import androidx.lifecycle.SavedStateHandle
 import cn.qingkui.app.data.repository.AppRepository
 import cn.qingkui.app.data.repository.GraphData
 import cn.qingkui.app.data.repository.MistakeAnalysisOutcome
@@ -51,6 +52,110 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModelTest {
+    @Test
+    fun restoresAndPersistsNonSensitiveUiStateAcrossProcessRecreation() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val savedState = SavedStateHandle(
+                mapOf(
+                    "ui.destination" to AppDestination.Graph.name,
+                    "ui.chat_draft" to "尚未发送的问题",
+                    "ui.selected_node" to "history-node",
+                    "ui.help_level" to QaHelpLevel.Full.name,
+                    "ui.qa_mode" to QaMode.Verify.name,
+                    "ui.subject" to "历史",
+                    "ui.scope_grade" to "高一",
+                    "ui.scope_version" to "人教版",
+                    "ui.learning_filter" to LearningFilter.Review.name,
+                    "ui.shows_mistakes" to true,
+                    "ui.session_search" to "辛亥革命",
+                    "ui.conversation_id" to "conversation-restore",
+                ),
+            )
+            val viewModel = AppViewModel(FakeRepository(authenticated = false), savedStateHandle = savedState)
+
+            assertEquals(AppDestination.Graph, viewModel.uiState.value.destination)
+            assertEquals("尚未发送的问题", viewModel.uiState.value.draft)
+            assertEquals(QaHelpLevel.Full, viewModel.uiState.value.helpLevel)
+            assertEquals(QaMode.Verify, viewModel.uiState.value.qaMode)
+            assertEquals("历史", viewModel.uiState.value.selectedKnowledgeScope?.subject)
+            assertEquals("人教版", viewModel.uiState.value.selectedKnowledgeScope?.textbookVersion)
+            assertEquals("conversation-restore", viewModel.uiState.value.conversationId)
+
+            viewModel.updateDraft("新的草稿")
+            viewModel.selectDestination(AppDestination.Learning)
+            viewModel.selectHelpLevel(QaHelpLevel.Keyword)
+            advanceUntilIdle()
+
+            assertEquals("新的草稿", savedState.get<String>("ui.chat_draft"))
+            assertEquals(AppDestination.Learning.name, savedState.get<String>("ui.destination"))
+            assertEquals(QaHelpLevel.Keyword.name, savedState.get<String>("ui.help_level"))
+            assertEquals(null, savedState.get<String>("ui.password"))
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun authenticatedProcessRecreationReloadsConversationFromBackend() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository(authenticated = true)
+            val savedState = SavedStateHandle(mapOf("ui.conversation_id" to "restored-session"))
+
+            AppViewModel(repository, savedStateHandle = savedState)
+            advanceUntilIdle()
+
+            assertEquals(listOf("restored-session"), repository.restoredSessions)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun selectingNodeRestoresPrivateNoteAndFavoriteFromDetail() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val viewModel = AppViewModel(FakeRepository())
+            advanceUntilIdle()
+
+            viewModel.selectNode("quadratic_function")
+            advanceUntilIdle()
+
+            assertEquals("复习定义域", viewModel.uiState.value.noteDraft)
+            assertTrue(viewModel.uiState.value.selectedNodeDetail?.saved == true)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun favoriteAndLatestPrivateNoteArePersistedAndReflectedInDetail() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val repository = FakeRepository()
+            val viewModel = AppViewModel(repository)
+            advanceUntilIdle()
+            viewModel.selectNode("quadratic_function")
+            advanceUntilIdle()
+
+            viewModel.toggleFavorite()
+            advanceUntilIdle()
+            assertEquals(false, viewModel.uiState.value.selectedNodeDetail?.saved)
+            assertEquals(false, repository.nodeStateUpdates.last().favorite)
+
+            repository.nodeStateUpdates.clear()
+            viewModel.updateNote("第一版")
+            viewModel.updateNote("最终笔记")
+            advanceUntilIdle()
+
+            assertEquals("最终笔记", viewModel.uiState.value.selectedNodeDetail?.note)
+            assertEquals(listOf("最终笔记"), repository.nodeStateUpdates.map { it.note })
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
     @Test
     fun existingSessionWaitsForUpdatedPrivacyConsent() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -592,9 +697,11 @@ private class FakeRepository(
     val redeemedCodes = mutableListOf<String>()
     val submittedContributionTitles = mutableListOf<String>()
     val requestedKnowledgeScopes = mutableListOf<KnowledgeCatalogScope>()
+    val restoredSessions = mutableListOf<String>()
     val answerFeedbackMessageIds = mutableListOf<String?>()
     val answerFeedbackActions = mutableListOf<AnswerFeedbackAction>()
     val answerFeedbackDetails = mutableListOf<String?>()
+    val nodeStateUpdates = mutableListOf<NodeStateCall>()
 
     override suspend fun hasSession() = authenticated
     override suspend fun nickname(): String? = null
@@ -637,7 +744,16 @@ private class FakeRepository(
     override suspend fun submitContribution(type: String, title: String, content: String, sourceReference: String?) { submittedContributionTitles += title }
     override suspend fun deleteContribution(contributionId: String) = Unit
     override suspend fun graph(centerId: String) = GraphData(emptyList(), emptyList(), null)
-    override suspend fun nodeDetail(nodeId: String) = throw UnsupportedOperationException()
+    override suspend fun nodeDetail(nodeId: String) = cn.qingkui.app.ui.model.KnowledgeNode(
+        id = nodeId,
+        title = "二次函数",
+        subtitle = "函数",
+        status = KnowledgeStatus.Explored,
+        x = .5f,
+        y = .5f,
+        saved = true,
+        note = "复习定义域",
+    )
     override suspend fun search(query: String) = GraphData(emptyList(), emptyList(), null)
     override suspend fun knowledgeCatalog() = listOf(
         KnowledgeCatalogScope("数学", "高一", "人教A版", 6),
@@ -662,7 +778,10 @@ private class FakeRepository(
             emptyList()
         }
     }
-    override suspend fun restoreSession(sessionId: String) = emptyList<ChatMessage>()
+    override suspend fun restoreSession(sessionId: String): List<ChatMessage> {
+        restoredSessions += sessionId
+        return emptyList()
+    }
     override suspend fun deleteSession(sessionId: String) = Unit
     override suspend fun clarifyQaIntent(question: String, mode: QaMode): QaClarification? =
         if (clarifyVague && question == "这个怎么做") {
@@ -681,7 +800,10 @@ private class FakeRepository(
             emptyList()
         }
     }
-    override suspend fun updateNodeState(nodeId: String, status: cn.qingkui.app.ui.model.KnowledgeStatus, note: String?, favorite: Boolean?) = null
+    override suspend fun updateNodeState(nodeId: String, status: cn.qingkui.app.ui.model.KnowledgeStatus, note: String?, favorite: Boolean?): LearningItem? {
+        nodeStateUpdates += NodeStateCall(nodeId, status, note, favorite)
+        return null
+    }
     override suspend fun startUnderstandingCheck(nodeId: String) = UnderstandingCheck(
         id = "check-1",
         nodeId = nodeId,
@@ -776,3 +898,10 @@ private class FakeRepository(
     override suspend fun generateMistakePractice(mistakeId: String) = Unit
     override suspend fun submitMistakePractice(mistakeId: String, practiceId: String, answer: String) = Unit
 }
+
+private data class NodeStateCall(
+    val nodeId: String,
+    val status: KnowledgeStatus,
+    val note: String?,
+    val favorite: Boolean?,
+)

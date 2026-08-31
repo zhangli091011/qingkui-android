@@ -3,6 +3,7 @@ package cn.qingkui.app.ui.screens
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -26,13 +27,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.RotateLeft
+import androidx.compose.material.icons.automirrored.outlined.RotateRight
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Replay
 import androidx.compose.material.icons.outlined.EditNote
-import androidx.compose.material.icons.outlined.RotateLeft
-import androidx.compose.material.icons.outlined.RotateRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -55,10 +56,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import cn.qingkui.app.data.local.MistakeImageProcessor
@@ -66,6 +67,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
 import java.util.UUID
 import kotlin.math.roundToInt
 
@@ -92,16 +95,19 @@ fun MistakeCaptureScreen(
     }
     val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
+            val directory = File(context.filesDir, "mistake-images").apply { mkdirs() }
+            val target = File(directory, "${UUID.randomUUID()}.jpg")
             runCatching {
-                val directory = File(context.filesDir, "mistake-images").apply { mkdirs() }
-                val target = File(directory, "${UUID.randomUUID()}.jpg")
                 context.contentResolver.openInputStream(uri).use { input ->
                     requireNotNull(input) { "无法读取所选图片" }
-                    target.outputStream().use { output -> input.copyTo(output) }
+                    target.outputStream().use { output -> input.copyToWithLimit(output, MAX_SOURCE_IMAGE_BYTES) }
                 }
                 imagePath = target.absolutePath
                 error = null
-            }.onFailure { error = it.message ?: "无法读取所选图片" }
+            }.onFailure {
+                target.delete()
+                error = it.message ?: "无法读取所选图片"
+            }
         }
     }
 
@@ -124,6 +130,8 @@ fun MistakeCaptureScreen(
         )
         return
     }
+
+    BackHandler(onBack = onClose)
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(
@@ -219,6 +227,20 @@ fun MistakeCaptureScreen(
     }
 }
 
+private const val MAX_SOURCE_IMAGE_BYTES = 20L * 1024 * 1024
+
+private fun InputStream.copyToWithLimit(output: OutputStream, maxBytes: Long) {
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var total = 0L
+    while (true) {
+        val read = read(buffer)
+        if (read < 0) return
+        total += read
+        require(total <= maxBytes) { "图片不能超过 20 MB" }
+        output.write(buffer, 0, read)
+    }
+}
+
 @Composable
 private fun MistakeImageEditor(
     imagePath: String?,
@@ -236,6 +258,12 @@ private fun MistakeImageEditor(
     var cropInsetFraction by remember { mutableStateOf(0f) }
     var processing by remember { mutableStateOf(false) }
     var processingError by remember { mutableStateOf<String?>(null) }
+    BackHandler {
+        if (!processing) {
+            imagePath?.let { File(it).delete() }
+            onClose()
+        }
+    }
     Column(
         Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).verticalScroll(rememberScrollState()),
     ) {
@@ -284,7 +312,7 @@ private fun MistakeImageEditor(
                         enabled = !processing,
                         modifier = Modifier.weight(1f),
                     ) {
-                        Icon(Icons.Outlined.RotateLeft, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Outlined.RotateLeft, contentDescription = null)
                         Spacer(Modifier.size(6.dp))
                         Text("左旋")
                     }
@@ -293,7 +321,7 @@ private fun MistakeImageEditor(
                         enabled = !processing,
                         modifier = Modifier.weight(1f),
                     ) {
-                        Icon(Icons.Outlined.RotateRight, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Outlined.RotateRight, contentDescription = null)
                         Spacer(Modifier.size(6.dp))
                         Text("右旋")
                     }

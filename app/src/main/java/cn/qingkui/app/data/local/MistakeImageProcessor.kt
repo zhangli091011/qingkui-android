@@ -10,6 +10,8 @@ import java.util.UUID
 import kotlin.math.max
 import kotlin.math.roundToInt
 
+private const val MAX_SOURCE_PIXELS = 100_000_000L
+
 object MistakeImageProcessor {
     fun process(
         sourcePath: String,
@@ -24,6 +26,7 @@ object MistakeImageProcessor {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(source.absolutePath, bounds)
         require(bounds.outWidth > 0 && bounds.outHeight > 0) { "无法解析图片" }
+        require(bounds.outWidth.toLong() * bounds.outHeight.toLong() <= MAX_SOURCE_PIXELS) { "图片像素尺寸过大" }
         var sampleSize = 1
         while (max(bounds.outWidth, bounds.outHeight) / sampleSize > maxEdge * 2) {
             sampleSize *= 2

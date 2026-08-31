@@ -84,6 +84,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cn.qingkui.app.ui.components.QkIconButton
+import cn.qingkui.app.ui.components.MathRichText
 import cn.qingkui.app.ui.model.KnowledgeKind
 import cn.qingkui.app.ui.model.KnowledgeCatalogScope
 import cn.qingkui.app.ui.model.KnowledgeNode
@@ -537,6 +538,7 @@ private fun GraphCanvas(
         }
     }
     val metaPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER } }
+    val allNodesById = remember(allNodes) { allNodes.associateBy { it.id } }
 
     Box(
         modifier = modifier
@@ -598,8 +600,8 @@ private fun GraphCanvas(
                     .filter { relationFilter == null || it.type == relationFilter }
                     .filter { it.fromId in nodeIds && it.toId in nodeIds }
                     .forEach { relation ->
-                        val from = allNodes.first { it.id == relation.fromId }
-                        val to = allNodes.first { it.id == relation.toId }
+                        val from = allNodesById[relation.fromId] ?: return@forEach
+                        val to = allNodesById[relation.toId] ?: return@forEach
                         drawLine(
                             color = relationColors.getValue(relation.type).copy(alpha = .78f),
                             start = Offset(size.width * from.x, size.height * from.y),
@@ -635,7 +637,12 @@ private fun GraphCanvas(
                         sourceColors.getValue(node.source), 5.dp.toPx(),
                         Offset(topLeft.x + nodeWidth - 9.dp.toPx(), topLeft.y + 9.dp.toPx()),
                     )
-                    drawContext.canvas.nativeCanvas.drawText(node.title, center.x, center.y + 1.dp.toPx(), labelPaint)
+                    drawContext.canvas.nativeCanvas.drawText(
+                        node.title.fitToWidth(labelPaint, nodeWidth - 16.dp.toPx()),
+                        center.x,
+                        center.y + 1.dp.toPx(),
+                        labelPaint,
+                    )
                     drawContext.canvas.nativeCanvas.drawText(node.kind.label, center.x, center.y + 19.dp.toPx(), metaPaint)
                 }
             }
@@ -655,6 +662,18 @@ private fun GraphCanvas(
             QkIconButton(Icons.Outlined.ZoomIn, "放大图谱", onClick = { zoomFactor = (zoomFactor * 1.2f).coerceAtMost(2.4f) })
         }
     }
+}
+
+private fun String.fitToWidth(paint: Paint, maxWidth: Float): String {
+    if (paint.measureText(this) <= maxWidth) return this
+    val suffix = "…"
+    var low = 0
+    var high = length
+    while (low < high) {
+        val middle = (low + high + 1) / 2
+        if (paint.measureText(take(middle) + suffix) <= maxWidth) low = middle else high = middle - 1
+    }
+    return take(low) + suffix
 }
 
 @Composable
@@ -754,7 +773,6 @@ private fun NodeDetailPanel(
     modifier: Modifier = Modifier,
 ) {
     var activeTab by remember(node.id) { mutableStateOf(DetailTab.Overview) }
-    var saved by remember(node.id) { mutableStateOf(node.saved) }
     val nodeRelations = remember(node.id, relations) { relations.filter { it.fromId == node.id || it.toId == node.id } }
     Column(
         modifier = modifier
@@ -772,11 +790,11 @@ private fun NodeDetailPanel(
                 Text(node.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             QkIconButton(
-                imageVector = if (saved) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
-                contentDescription = if (saved) "取消收藏" else "添加到我的库",
-                onClick = { saved = !saved; onToggleFavorite() },
-                containerColor = if (saved) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                contentColor = if (saved) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                imageVector = if (node.saved) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
+                contentDescription = if (node.saved) "取消收藏" else "添加到我的库",
+                onClick = onToggleFavorite,
+                containerColor = if (node.saved) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                contentColor = if (node.saved) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
             )
         }
         Spacer(Modifier.height(14.dp))
@@ -909,7 +927,7 @@ private fun DetailTabRow(selected: DetailTab, onSelect: (DetailTab) -> Unit) {
 @Composable
 private fun OverviewContent(node: KnowledgeNode) {
     Column {
-        Text(node.description, style = MaterialTheme.typography.bodyLarge, maxLines = 4, overflow = TextOverflow.Ellipsis)
+        MathRichText(node.description, style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(14.dp))
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         Spacer(Modifier.height(12.dp))
@@ -965,7 +983,11 @@ private fun KnowledgeBullet(title: String, body: String) {
         Spacer(Modifier.width(8.dp))
         Column {
             Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-            Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            MathRichText(
+                body,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

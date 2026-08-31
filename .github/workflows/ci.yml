@@ -25,12 +25,14 @@ jobs:
         run: ./gradlew :app:testDebugUnitTest -PQINGKUI_ENV=test
       - name: Android Lint
         run: ./gradlew :app:lintDebug -PQINGKUI_ENV=test
-      - name: Build Debug APK
-        run: ./gradlew :app:assembleDebug -PQINGKUI_ENV=test
-      - name: Upload Debug APK
+      - name: Build production-connected Debug APK
+        run: ./gradlew :app:assembleDebug -PQINGKUI_ENV=production
+      - name: Verify production API is embedded
+        run: grep -F 'https://qingkui-api.82-158-229-157.sslip.io/api/' app/build/generated/source/buildConfig/debug/cn/qingkui/app/BuildConfig.java
+      - name: Upload production-connected Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: qingkui-debug-apk
+          name: qingkui-production-connected-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14

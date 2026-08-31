@@ -1,9 +1,12 @@
 package cn.qingkui.app.ui
 
 import android.content.Context
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
 import cn.qingkui.app.data.repository.ApiFailureException
 import cn.qingkui.app.data.repository.AppRepository
 import cn.qingkui.app.data.repository.AppRepositoryProvider
@@ -31,21 +34,27 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 
 class AppViewModel(
     private val repository: AppRepository,
     private val mistakePollIntervalMillis: Long = 3_000,
     private val mistakePollMaxAttempts: Int = 40,
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(AppUiState())
+    private val _uiState = MutableStateFlow(restoredUiState(savedStateHandle))
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
     private var mistakePollingJob: Job? = null
     private var qaJob: Job? = null
     private var qaAssistantMessageId: Long? = null
+    private val noteSaveJobs = mutableMapOf<String, Job>()
     private var lastLocalMessageId: Long = 0
 
     init {
+        viewModelScope.launch {
+            _uiState.collectLatest { state -> persistUiState(savedStateHandle, state) }
+        }
         viewModelScope.launch {
             repository.observeMistakeDrafts().collectLatest { drafts ->
                 _uiState.update { it.copy(mistakeDrafts = drafts) }
@@ -73,7 +82,27 @@ class AppViewModel(
                     currentUserName = repository.nickname() ?: it.currentUserName,
                 )
             }
-            if (hasSession && !consentRequired) refreshContent()
+            if (hasSession && !consentRequired) {
+                refreshContent()
+                restorePersistedConversation()
+            }
+        }
+    }
+
+    private fun restorePersistedConversation() {
+        val conversationId = _uiState.value.conversationId ?: return
+        viewModelScope.launch {
+            runCatching { repository.restoreSession(conversationId) }
+                .onSuccess { messages ->
+                    _uiState.update { state ->
+                        if (state.conversationId == conversationId) state.copy(messages = messages) else state
+                    }
+                }
+                .onFailure {
+                    _uiState.update { state ->
+                        if (state.conversationId == conversationId) state.copy(conversationId = null, messages = emptyList()) else state
+                    }
+                }
         }
     }
 
@@ -150,7 +179,11 @@ class AppViewModel(
         try {
             val (credits, graph, learning, sessions, ledger, mistakes) = coroutineScope {
                 val creditTask = async { repository.credits() }
-                val graphTask = async { repository.graph() }
+                val graphTask = async {
+                    _uiState.value.selectedNodeId?.let { selectedNodeId ->
+                        runCatching { repository.graph(selectedNodeId) }.getOrNull()
+                    } ?: repository.graph()
+                }
                 val learningTask = async { repository.learningItems(_uiState.value.learningFilter) }
                 val sessionsTask = async {
                     repository.sessions(_uiState.value.sessionSearchQuery.trim().takeIf { it.isNotEmpty() })
@@ -159,19 +192,37 @@ class AppViewModel(
                 val mistakesTask = async { repository.mistakes() }
                 Sextuple(creditTask.await(), graphTask.await(), learningTask.await(), sessionsTask.await(), ledgerTask.await(), mistakesTask.await())
             }
-            val catalog = repository.knowledgeCatalog()
-            val scope = catalog.firstOrNull { it.subject == _uiState.value.currentSubject } ?: catalog.firstOrNull()
+            val (catalog, selectedDetail) = coroutineScope {
+                val catalogTask = async { repository.knowledgeCatalog() }
+                val detailTask = async {
+                    graph.selectedNodeId?.let { nodeId -> runCatching { repository.nodeDetail(nodeId) }.getOrNull() }
+                }
+                catalogTask.await() to detailTask.await()
+            }
+            val restoredScope = _uiState.value.selectedKnowledgeScope
+            val scope = catalog.firstOrNull {
+                restoredScope != null &&
+                    it.subject == restoredScope.subject &&
+                    it.grade == restoredScope.grade &&
+                    it.textbookVersion == restoredScope.textbookVersion
+            } ?: catalog.firstOrNull { it.subject == _uiState.value.currentSubject } ?: catalog.firstOrNull()
             val chapters = if (scope != null) repository.knowledgeTree(scope) else emptyList()
             _uiState.update {
                 it.copy(
                     credits = credits,
-                    graphNodes = graph.nodes,
+                    graphNodes = graph.nodes.map { node ->
+                        if (selectedDetail != null && node.id == selectedDetail.id) selectedDetail else node
+                    },
                     graphRelations = graph.relations,
                     knowledgeCatalog = catalog,
                     selectedKnowledgeScope = scope,
                     knowledgeChapters = chapters,
                     selectedNodeId = graph.selectedNodeId,
-                    currentSubject = graph.nodes.firstOrNull()?.evidence?.substringBefore(" · ") ?: it.currentSubject,
+                    selectedNodeDetail = selectedDetail,
+                    noteDraft = selectedDetail?.note.orEmpty(),
+                    currentSubject = scope?.subject
+                        ?: graph.nodes.firstOrNull()?.evidence?.substringBefore(" · ")
+                        ?: it.currentSubject,
                     learningItems = learning,
                     sessions = sessions,
                     ledger = ledger,
@@ -700,13 +751,29 @@ class AppViewModel(
     }
 
     fun selectNode(nodeId: String) {
-        _uiState.update { it.copy(selectedNodeId = nodeId, conversationId = null, understandingCheck = null) }
+        _uiState.update {
+            it.copy(
+                selectedNodeId = nodeId,
+                selectedNodeDetail = null,
+                noteDraft = "",
+                conversationId = null,
+                understandingCheck = null,
+            )
+        }
         viewModelScope.launch {
             runCatching { repository.graph(nodeId) }
                 .onSuccess { graph -> _uiState.update { it.copy(graphNodes = graph.nodes, graphRelations = graph.relations, selectedNodeId = nodeId) } }
                 .onFailure { handleApiError(it as? Exception ?: Exception(it)) { state -> state } }
             runCatching { repository.nodeDetail(nodeId) }
-                .onSuccess { detail -> _uiState.update { it.copy(selectedNodeDetail = detail, graphNodes = it.graphNodes.map { node -> if (node.id == nodeId) detail else node }) } }
+                .onSuccess { detail ->
+                    _uiState.update {
+                        it.copy(
+                            selectedNodeDetail = detail,
+                            noteDraft = detail.note,
+                            graphNodes = it.graphNodes.map { node -> if (node.id == nodeId) detail else node },
+                        )
+                    }
+                }
                 .onFailure { handleApiError(it as? Exception ?: Exception(it)) { state -> state } }
             runCatching { repository.recordLearningEvent(nodeId, "viewed_node") }
         }
@@ -717,7 +784,13 @@ class AppViewModel(
         viewModelScope.launch {
             try {
                 repository.updateNodeState(nodeId, status, _uiState.value.noteDraft, null)
-                _uiState.update { state -> state.copy(graphNodes = state.graphNodes.map { if (it.id == nodeId) it.copy(status = status) else it }, learningItems = state.learningItems.map { if (it.nodeId == nodeId) it.copy(status = status) else it }) }
+                _uiState.update { state ->
+                    state.copy(
+                        graphNodes = state.graphNodes.map { if (it.id == nodeId) it.copy(status = status) else it },
+                        selectedNodeDetail = state.selectedNodeDetail?.let { if (it.id == nodeId) it.copy(status = status) else it },
+                        learningItems = state.learningItems.map { if (it.nodeId == nodeId) it.copy(status = status) else it },
+                    )
+                }
             } catch (error: Exception) { handleApiError(error) { it } }
         }
     }
@@ -751,6 +824,9 @@ class AppViewModel(
                         graphNodes = state.graphNodes.map { node ->
                             if (node.id == check.nodeId) node.copy(status = outcome.status) else node
                         },
+                        selectedNodeDetail = state.selectedNodeDetail?.let { node ->
+                            if (node.id == check.nodeId) node.copy(status = outcome.status) else node
+                        },
                         learningItems = state.learningItems.map { item ->
                             if (item.nodeId == check.nodeId) item.copy(status = outcome.status) else item
                         },
@@ -773,23 +849,58 @@ class AppViewModel(
 
     fun toggleFavorite() {
         val nodeId = _uiState.value.selectedNodeId ?: return
-        val node = _uiState.value.graphNodes.firstOrNull { it.id == nodeId } ?: return
+        val node = _uiState.value.selectedNodeDetail
+            ?.takeIf { it.id == nodeId }
+            ?: _uiState.value.graphNodes.firstOrNull { it.id == nodeId }
+            ?: return
         viewModelScope.launch {
             try {
                 repository.updateNodeState(nodeId, node.status, _uiState.value.noteDraft, !node.saved)
-                _uiState.update { state -> state.copy(graphNodes = state.graphNodes.map { if (it.id == nodeId) it.copy(saved = !node.saved) else it }) }
+                _uiState.update { state ->
+                    state.copy(
+                        graphNodes = state.graphNodes.map { if (it.id == nodeId) it.copy(saved = !node.saved) else it },
+                        selectedNodeDetail = state.selectedNodeDetail?.let {
+                            if (it.id == nodeId) it.copy(saved = !node.saved) else it
+                        },
+                    )
+                }
             } catch (error: Exception) { handleApiError(error) { it } }
         }
     }
 
     fun updateNote(value: String) {
         val nodeId = _uiState.value.selectedNodeId
-        _uiState.update { it.copy(noteDraft = value) }
+        _uiState.update {
+            it.copy(
+                noteDraft = value,
+                selectedNodeDetail = it.selectedNodeDetail?.let { node ->
+                    if (node.id == nodeId) node.copy(note = value) else node
+                },
+                graphNodes = it.graphNodes.map { node -> if (node.id == nodeId) node.copy(note = value) else node },
+            )
+        }
         if (nodeId != null) {
-            viewModelScope.launch {
-                kotlinx.coroutines.delay(450)
-                runCatching { repository.updateNodeState(nodeId, _uiState.value.graphNodes.firstOrNull { it.id == nodeId }?.status ?: KnowledgeStatus.Explored, value, null) }
+            val previous = noteSaveJobs[nodeId]
+            val job = viewModelScope.launch {
+                previous?.cancelAndJoin()
+                delay(450)
+                val status = _uiState.value.graphNodes.firstOrNull { it.id == nodeId }?.status
+                    ?: KnowledgeStatus.Explored
+                try {
+                    repository.updateNodeState(nodeId, status, value, null)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (_uiState.value.selectedNodeId == nodeId) {
+                        handleApiError(error) { it }
+                    }
+                } finally {
+                    if (noteSaveJobs[nodeId] === currentCoroutineContext()[Job]) {
+                        noteSaveJobs.remove(nodeId)
+                    }
+                }
             }
+            noteSaveJobs[nodeId] = job
         }
     }
 
@@ -994,7 +1105,7 @@ class AppViewModel(
         402 -> "额度不足，请先补充额度"
         428 -> "请先阅读并同意当前版本的隐私说明"
         502 -> "AI 服务暂时不可用，本次未扣除额度"
-        503 -> "AI 服务尚未配置，请联系管理员"
+        503 -> message ?: "AI 服务暂时不可用，请稍后再试"
         else -> message ?: "发生未知错误，请稍后重试"
     }
 
@@ -1005,8 +1116,70 @@ class AppViewModel(
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
                 AppViewModel(AppRepositoryProvider.get(context)) as T
+
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T =
+                AppViewModel(
+                    repository = AppRepositoryProvider.get(context),
+                    savedStateHandle = extras.createSavedStateHandle(),
+                ) as T
         }
     }
+}
+
+private const val STATE_DESTINATION = "ui.destination"
+private const val STATE_DRAFT = "ui.chat_draft"
+private const val STATE_SELECTED_NODE = "ui.selected_node"
+private const val STATE_HELP_LEVEL = "ui.help_level"
+private const val STATE_QA_MODE = "ui.qa_mode"
+private const val STATE_SUBJECT = "ui.subject"
+private const val STATE_SCOPE_GRADE = "ui.scope_grade"
+private const val STATE_SCOPE_VERSION = "ui.scope_version"
+private const val STATE_LEARNING_FILTER = "ui.learning_filter"
+private const val STATE_SHOWS_MISTAKES = "ui.shows_mistakes"
+private const val STATE_SESSION_SEARCH = "ui.session_search"
+private const val STATE_CONVERSATION_ID = "ui.conversation_id"
+
+private fun restoredUiState(handle: SavedStateHandle): AppUiState {
+    val subject = handle.get<String>(STATE_SUBJECT)?.takeIf { it.isNotBlank() } ?: "数学"
+    val grade = handle.get<String>(STATE_SCOPE_GRADE)
+    val version = handle.get<String>(STATE_SCOPE_VERSION)
+    val scope = if (!grade.isNullOrBlank() && !version.isNullOrBlank()) {
+        KnowledgeCatalogScope(subject, grade, version, 0)
+    } else {
+        null
+    }
+    return AppUiState(
+        destination = enumValueOrDefault(handle[STATE_DESTINATION], AppDestination.Chat),
+        draft = handle.get<String>(STATE_DRAFT).orEmpty(),
+        selectedNodeId = handle[STATE_SELECTED_NODE],
+        helpLevel = enumValueOrDefault(handle[STATE_HELP_LEVEL], QaHelpLevel.Approach),
+        qaMode = enumValueOrDefault(handle[STATE_QA_MODE], QaMode.Knowledge),
+        currentSubject = subject,
+        selectedKnowledgeScope = scope,
+        learningFilter = enumValueOrDefault(handle[STATE_LEARNING_FILTER], LearningFilter.Recent),
+        learningShowsMistakes = handle.get<Boolean>(STATE_SHOWS_MISTAKES) ?: false,
+        sessionSearchQuery = handle.get<String>(STATE_SESSION_SEARCH).orEmpty().take(120),
+        conversationId = handle[STATE_CONVERSATION_ID],
+    )
+}
+
+private inline fun <reified T : Enum<T>> enumValueOrDefault(value: String?, fallback: T): T =
+    enumValues<T>().firstOrNull { it.name == value } ?: fallback
+
+private fun persistUiState(handle: SavedStateHandle, state: AppUiState) {
+    handle[STATE_DESTINATION] = state.destination.name
+    handle[STATE_DRAFT] = state.draft
+    handle[STATE_SELECTED_NODE] = state.selectedNodeId
+    handle[STATE_HELP_LEVEL] = state.helpLevel.name
+    handle[STATE_QA_MODE] = state.qaMode.name
+    handle[STATE_SUBJECT] = state.currentSubject
+    handle[STATE_SCOPE_GRADE] = state.selectedKnowledgeScope?.grade
+    handle[STATE_SCOPE_VERSION] = state.selectedKnowledgeScope?.textbookVersion
+    handle[STATE_LEARNING_FILTER] = state.learningFilter.name
+    handle[STATE_SHOWS_MISTAKES] = state.learningShowsMistakes
+    handle[STATE_SESSION_SEARCH] = state.sessionSearchQuery
+    handle[STATE_CONVERSATION_ID] = state.conversationId
 }
 
 private fun featureAvailability(result: Result<*>): Boolean? = when {

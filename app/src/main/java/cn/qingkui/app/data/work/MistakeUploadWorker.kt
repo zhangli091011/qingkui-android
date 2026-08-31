@@ -39,7 +39,7 @@ class MistakeUploadWorker(
                     questionGoal = draft.questionGoal.ifBlank { "识别图片中的题目并分析错因" },
                     errorCategory = draft.errorCategory,
                 ),
-            ).id
+            ).id.also { dao.markRemoteCreated(draftId, it) }
             if (image == null) {
                 dao.markUploaded(draftId, mistakeId, null)
                 return Result.success()
@@ -59,8 +59,9 @@ class MistakeUploadWorker(
             Result.success()
         } catch (error: Exception) {
             val retryable = error !is HttpException || error.code() >= 500 || error.code() == 408 || error.code() == 429
-            dao.updateStatus(draftId, if (retryable) "waiting" else "failed", error.message?.take(240))
-            if (retryable && runAttemptCount < 5) Result.retry() else Result.failure()
+            val willRetry = retryable && runAttemptCount < 5
+            dao.updateStatus(draftId, if (willRetry) "waiting" else "failed", error.message?.take(240))
+            if (willRetry) Result.retry() else Result.failure()
         }
     }
 
