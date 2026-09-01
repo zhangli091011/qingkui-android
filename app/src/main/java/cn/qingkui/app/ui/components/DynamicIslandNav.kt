@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,6 +42,7 @@ fun DynamicIslandNav(
         if (showContent) add(AppDestination.Content)
         if (showOperations) add(AppDestination.Operations)
         addAll(listOf(AppDestination.Chat, AppDestination.Graph, AppDestination.Learning))
+        add(AppDestination.Mistakes)
         if (!compact) add(AppDestination.Account)
     }
     val height = if (compact) 56.dp else 64.dp
@@ -50,7 +52,7 @@ fun DynamicIslandNav(
 
     Row(
         modifier = modifier
-            .width((itemWidth * destinations.size) + (gap * (destinations.size - 1)) + (horizontalPadding * 2))
+            .widthIn(min = (itemWidth * destinations.size) + (gap * (destinations.size - 1)) + (horizontalPadding * 2))
             .height(height)
             .background(QingkuiDarkSurface, RoundedCornerShape(28.dp))
             .padding(horizontal = horizontalPadding, vertical = if (compact) 6.dp else 8.dp),

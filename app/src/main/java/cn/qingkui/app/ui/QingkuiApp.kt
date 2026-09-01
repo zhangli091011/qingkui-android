@@ -152,17 +152,19 @@ fun QingkuiApp() {
                 )
             }
             Column(Modifier.fillMaxSize()) {
-                AppTopBar(
-                    selected = uiState.destination,
-                    credits = uiState.credits,
-                    compact = compact,
-                    onMenuClick = { viewModel.setDrawerOpen(true) },
-                    onSelect = viewModel::selectDestination,
-                    showWorkspace = uiState.workspaceCapabilities.contentWorkspace || uiState.workspaceCapabilities.operationsWorkspace,
-                    showTeacher = uiState.workspaceCapabilities.teacherWorkspace,
-                    showContent = uiState.workspaceCapabilities.contentWorkspace,
-                    showOperations = uiState.workspaceCapabilities.operationsWorkspace,
-                )
+                if (uiState.destination != AppDestination.Graph) {
+                    AppTopBar(
+                        selected = uiState.destination,
+                        credits = uiState.credits,
+                        compact = compact,
+                        onMenuClick = { viewModel.setDrawerOpen(true) },
+                        onSelect = viewModel::selectDestination,
+                        showWorkspace = uiState.workspaceCapabilities.contentWorkspace || uiState.workspaceCapabilities.operationsWorkspace,
+                        showTeacher = uiState.workspaceCapabilities.teacherWorkspace,
+                        showContent = uiState.workspaceCapabilities.contentWorkspace,
+                        showOperations = uiState.workspaceCapabilities.operationsWorkspace,
+                    )
+                }
                 if (uiState.contentLoading) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
@@ -171,11 +173,39 @@ fun QingkuiApp() {
                     AppDestination.Teacher,
                     AppDestination.Content,
                     AppDestination.Operations -> WorkspaceScreen(
+                        destination = uiState.destination,
                         dashboard = uiState.workspaceDashboard,
                         tasks = uiState.workspaceTasks,
                         alerts = uiState.workspaceAlerts,
                         compact = compact,
                         onRefresh = viewModel::refreshWorkspace,
+                    )
+                    AppDestination.Mistakes -> LearningScreen(
+                        compact = compact,
+                        items = uiState.learningItems,
+                        selectedFilter = uiState.learningFilter,
+                        mistakeDrafts = uiState.mistakeDrafts,
+                        mistakes = uiState.mistakes,
+                        showMistakes = true,
+                        mistakeLoading = uiState.mistakeLoading,
+                        aiAvailable = uiState.aiAvailable,
+                        weeklyReview = uiState.mistakeWeeklyReview,
+                        onOpenItem = { nodeId -> viewModel.selectNode(nodeId); viewModel.selectDestination(AppDestination.Graph) },
+                        onShowLearning = viewModel::showLearningRecords,
+                        onFilterChange = viewModel::selectLearningFilter,
+                        onShowMistakes = viewModel::showMistakeBook,
+                        onCaptureMistake = viewModel::openMistakeCapture,
+                        onRefreshMistakes = viewModel::refreshMistakes,
+                        onRetryDraft = viewModel::retryMistakeDraft,
+                        onDeleteDraft = viewModel::deleteMistakeDraft,
+                        onCancelOcr = viewModel::cancelMistakeOcr,
+                        onRetryOcr = viewModel::retryMistakeOcr,
+                        onDeleteMistake = viewModel::deleteMistake,
+                        onConfirmOcr = viewModel::confirmMistakeOcr,
+                        onAnalyzeMistake = viewModel::analyzeMistake,
+                        onGeneratePractice = viewModel::generateMistakePractice,
+                        onSubmitPractice = viewModel::submitMistakePractice,
+                        onAskMistake = viewModel::askAboutMistake,
                     )
                     AppDestination.Chat -> ChatScreen(
                         compact = compact,

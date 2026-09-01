@@ -7,6 +7,7 @@ enum class AppDestination(val label: String) {
     Teacher("班级"),
     Content("内容"),
     Operations("运行"),
+    Mistakes("错题"),
     Chat("问答"),
     Graph("图谱"),
     Learning("学习"),
@@ -38,9 +39,15 @@ data class WorkspaceMetricSnapshot(
     val aiHelpfulRate: Double = 0.0,
     val aiFailureRate: Double = 0.0,
     val averageUserCostTokens: Double = 0.0,
+    val mistakesCreated: Int = 0,
     val pendingContent: Int? = null,
     val pendingFormulas: Int? = null,
     val approvedNodes: Int? = null,
+    val documents: Int? = null,
+    val knowledgeEdges: Int? = null,
+    val pendingFeedback: Int? = null,
+    val auditEvents: Int? = null,
+    val releaseGatePassed: Boolean? = null,
     val securityEvents: Int = 0,
 )
 

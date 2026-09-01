@@ -148,7 +148,7 @@ fun KnowledgeGraphScreen(
         onSearch(searchQuery)
     }
 
-    Column(modifier = modifier.fillMaxSize().padding(horizontal = if (compact) 20.dp else 40.dp)) {
+    Column(modifier = modifier.fillMaxSize().padding(horizontal = if (compact) 12.dp else 0.dp)) {
         GraphHeader(
             compact = compact,
             displayMode = displayMode,
@@ -540,11 +540,7 @@ private fun GraphCanvas(
     val metaPaint = remember { Paint().apply { isAntiAlias = true; textAlign = Paint.Align.CENTER } }
     val allNodesById = remember(allNodes) { allNodes.associateBy { it.id } }
 
-    Box(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = .78f), RoundedCornerShape(8.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
-    ) {
+    Box(modifier = modifier.background(MaterialTheme.colorScheme.surface.copy(alpha = .92f))) {
         val ink = MaterialTheme.colorScheme.onSurface
         val secondary = MaterialTheme.colorScheme.onSurfaceVariant
         val outline = MaterialTheme.colorScheme.outline

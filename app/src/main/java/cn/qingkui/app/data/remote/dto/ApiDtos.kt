@@ -114,6 +114,11 @@ data class WorkspaceMetricsDto(
     @SerializedName("pending_content") val pendingContent: Int? = null,
     @SerializedName("pending_formulas") val pendingFormulas: Int? = null,
     @SerializedName("approved_nodes") val approvedNodes: Int? = null,
+    val documents: Int? = null,
+    @SerializedName("knowledge_edges") val knowledgeEdges: Int? = null,
+    @SerializedName("pending_feedback") val pendingFeedback: Int? = null,
+    @SerializedName("audit_events") val auditEvents: Int? = null,
+    @SerializedName("release_gate_passed") val releaseGatePassed: Boolean? = null,
     @SerializedName("security_events") val securityEvents: Int = 0,
 )
 
