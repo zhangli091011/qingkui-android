@@ -3,11 +3,68 @@ package cn.qingkui.app.ui.model
 import androidx.compose.runtime.Immutable
 
 enum class AppDestination(val label: String) {
+    Workspace("驾驶舱"),
+    Teacher("班级"),
+    Content("内容"),
+    Operations("运行"),
     Chat("问答"),
     Graph("图谱"),
     Learning("学习"),
     Account("账户"),
 }
+
+@Immutable
+data class WorkspaceCapabilities(
+    val studentWorkspace: Boolean = true,
+    val teacherWorkspace: Boolean = false,
+    val contentWorkspace: Boolean = false,
+    val operationsWorkspace: Boolean = false,
+    val rawStudentContent: Boolean = false,
+)
+
+@Immutable
+data class WorkspaceMetricSnapshot(
+    val activeStudents: Int = 0,
+    val sevenDayReturnRate: Double = 0.0,
+    val mistakeUploadSuccessRate: Double = 0.0,
+    val ocrCorrectionRate: Double = 0.0,
+    val queuedOcr: Int = 0,
+    val processingOcr: Int = 0,
+    val failedOcr: Int = 0,
+    val ocrNeedsReview: Int = 0,
+    val mistakeAnalysisCompletionRate: Double = 0.0,
+    val samePracticeCompletionRate: Double = 0.0,
+    val secondAttemptAccuracy: Double = 0.0,
+    val aiHelpfulRate: Double = 0.0,
+    val aiFailureRate: Double = 0.0,
+    val averageUserCostTokens: Double = 0.0,
+    val pendingContent: Int? = null,
+    val pendingFormulas: Int? = null,
+    val approvedNodes: Int? = null,
+    val securityEvents: Int = 0,
+)
+
+@Immutable
+data class WorkspaceDashboard(
+    val generatedAt: String = "",
+    val rangeLabel: String = "近 7 天",
+    val metrics: WorkspaceMetricSnapshot = WorkspaceMetricSnapshot(),
+    val alerts: List<WorkspaceAlert> = emptyList(),
+    val releaseBlockers: List<WorkspaceAlert> = emptyList(),
+)
+
+@Immutable
+data class WorkspaceAlert(val severity: String, val code: String, val message: String, val value: Double? = null)
+
+@Immutable
+data class WorkspaceTask(
+    val type: String,
+    val id: String,
+    val status: String,
+    val requiresReview: Boolean,
+    val createdAt: String,
+    val errorCode: String? = null,
+)
 
 enum class MessageAuthor { Student, Assistant }
 
@@ -432,4 +489,9 @@ data class AppUiState(
     val learningShowsMistakes: Boolean = false,
     val understandingCheck: UnderstandingCheck? = null,
     val understandingCheckSubmitting: Boolean = false,
+    val workspaceRoles: List<String> = emptyList(),
+    val workspaceCapabilities: WorkspaceCapabilities = WorkspaceCapabilities(),
+    val workspaceDashboard: WorkspaceDashboard? = null,
+    val workspaceTasks: List<WorkspaceTask> = emptyList(),
+    val workspaceAlerts: List<WorkspaceAlert> = emptyList(),
 )

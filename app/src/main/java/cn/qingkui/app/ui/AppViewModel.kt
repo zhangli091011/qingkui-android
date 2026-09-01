@@ -23,6 +23,7 @@ import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.KnowledgeCatalogScope
 import cn.qingkui.app.ui.model.LearningFilter
 import cn.qingkui.app.ui.model.MistakeItem
+import cn.qingkui.app.ui.model.WorkspaceCapabilities
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -85,6 +86,7 @@ class AppViewModel(
             if (hasSession && !consentRequired) {
                 refreshContent()
                 restorePersistedConversation()
+                refreshWorkspace()
             }
         }
         viewModelScope.launch { refreshServiceAvailability() }
@@ -152,6 +154,7 @@ class AppViewModel(
                 }
                 if (!consentRequired) {
                     refreshContentNow()
+                    refreshWorkspace()
                     if (state.pendingSendAfterAuth) sendMessage()
                 }
             } catch (error: Exception) {
@@ -168,6 +171,7 @@ class AppViewModel(
                 val shouldSend = _uiState.value.pendingSendAfterAuth
                 _uiState.update { it.copy(privacyConsentRequired = false, authLoading = false) }
                 refreshContentNow()
+                refreshWorkspace()
                 if (shouldSend) sendMessage()
             } catch (error: Exception) {
                 _uiState.update { it.copy(authLoading = false, errorMessage = error.userMessage()) }
@@ -179,6 +183,32 @@ class AppViewModel(
         viewModelScope.launch {
             refreshServiceAvailability()
             refreshContentNow()
+        }
+    }
+
+    fun refreshWorkspace() {
+        if (!_uiState.value.authenticated) return
+        viewModelScope.launch {
+            try {
+                val (capabilities, roles) = repository.workspaceMe()
+                val dashboard = repository.workspaceDashboard()
+                val tasks = repository.workspaceTasks()
+                val alerts = repository.workspaceAlerts()
+                _uiState.update {
+                    it.copy(
+                        workspaceCapabilities = capabilities,
+                        workspaceRoles = roles,
+                        workspaceDashboard = dashboard,
+                        workspaceTasks = tasks,
+                        workspaceAlerts = alerts,
+                    )
+                }
+            } catch (error: Exception) {
+                // Workspace is additive; existing student screens remain usable if unavailable.
+                if (error is ApiFailureException && error.statusCode == 401) {
+                    _uiState.update { it.copy(workspaceDashboard = null, workspaceTasks = emptyList(), workspaceAlerts = emptyList()) }
+                }
+            }
         }
     }
 

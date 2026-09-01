@@ -57,6 +57,21 @@ interface QingkuiApi {
     @GET("../health")
     suspend fun health(): cn.qingkui.app.data.remote.dto.HealthDto
 
+    @GET("workspace/me")
+    suspend fun workspaceMe(): cn.qingkui.app.data.remote.dto.WorkspaceMeDto
+
+    @GET("workspace/dashboard")
+    suspend fun workspaceDashboard(@Query("days") days: Int = 7): cn.qingkui.app.data.remote.dto.WorkspaceDashboardDto
+
+    @GET("workspace/tasks")
+    suspend fun workspaceTasks(@Query("limit") limit: Int = 100): cn.qingkui.app.data.remote.dto.WorkspaceTasksDto
+
+    @GET("workspace/alerts")
+    suspend fun workspaceAlerts(): cn.qingkui.app.data.remote.dto.WorkspaceAlertsDto
+
+    @GET("workspace/activity")
+    suspend fun workspaceActivity(@Query("limit") limit: Int = 50): cn.qingkui.app.data.remote.dto.WorkspaceActivityResponseDto
+
     @POST("auth/register")
     suspend fun register(@Body body: RegisterRequest): AuthResponse
 

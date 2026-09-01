@@ -32,6 +32,10 @@ fun AppTopBar(
     compact: Boolean,
     onMenuClick: () -> Unit,
     onSelect: (AppDestination) -> Unit,
+    showWorkspace: Boolean = false,
+    showTeacher: Boolean = false,
+    showContent: Boolean = false,
+    showOperations: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -72,6 +76,10 @@ fun AppTopBar(
             selected = selected,
             compact = compact,
             onSelect = onSelect,
+            showWorkspace = showWorkspace,
+            showTeacher = showTeacher,
+            showContent = showContent,
+            showOperations = showOperations,
         )
 
         if (compact) {

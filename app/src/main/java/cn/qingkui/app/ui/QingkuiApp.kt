@@ -45,6 +45,7 @@ import cn.qingkui.app.ui.screens.ChatScreen
 import cn.qingkui.app.ui.screens.KnowledgeGraphScreen
 import cn.qingkui.app.ui.screens.LearningScreen
 import cn.qingkui.app.ui.screens.MistakeCaptureScreen
+import cn.qingkui.app.ui.screens.WorkspaceScreen
 
 @Composable
 fun QingkuiApp() {
@@ -157,11 +158,25 @@ fun QingkuiApp() {
                     compact = compact,
                     onMenuClick = { viewModel.setDrawerOpen(true) },
                     onSelect = viewModel::selectDestination,
+                    showWorkspace = uiState.workspaceCapabilities.contentWorkspace || uiState.workspaceCapabilities.operationsWorkspace,
+                    showTeacher = uiState.workspaceCapabilities.teacherWorkspace,
+                    showContent = uiState.workspaceCapabilities.contentWorkspace,
+                    showOperations = uiState.workspaceCapabilities.operationsWorkspace,
                 )
                 if (uiState.contentLoading) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
                 when (uiState.destination) {
+                    AppDestination.Workspace,
+                    AppDestination.Teacher,
+                    AppDestination.Content,
+                    AppDestination.Operations -> WorkspaceScreen(
+                        dashboard = uiState.workspaceDashboard,
+                        tasks = uiState.workspaceTasks,
+                        alerts = uiState.workspaceAlerts,
+                        compact = compact,
+                        onRefresh = viewModel::refreshWorkspace,
+                    )
                     AppDestination.Chat -> ChatScreen(
                         compact = compact,
                         draft = uiState.draft,

@@ -29,21 +29,28 @@ fun DynamicIslandNav(
     selected: AppDestination,
     compact: Boolean,
     onSelect: (AppDestination) -> Unit,
+    showWorkspace: Boolean = false,
+    showTeacher: Boolean = false,
+    showContent: Boolean = false,
+    showOperations: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val destinations = if (compact) {
-        listOf(AppDestination.Chat, AppDestination.Graph, AppDestination.Learning)
-    } else {
-        listOf(AppDestination.Chat, AppDestination.Graph, AppDestination.Learning, AppDestination.Account)
+    val destinations = buildList {
+        if (showWorkspace) add(AppDestination.Workspace)
+        if (showTeacher) add(AppDestination.Teacher)
+        if (showContent) add(AppDestination.Content)
+        if (showOperations) add(AppDestination.Operations)
+        addAll(listOf(AppDestination.Chat, AppDestination.Graph, AppDestination.Learning))
+        if (!compact) add(AppDestination.Account)
     }
     val height = if (compact) 56.dp else 64.dp
     val horizontalPadding = if (compact) 6.dp else 8.dp
     val gap = if (compact) 2.dp else 4.dp
-    val itemWidth = if (compact) 70.dp else 117.dp
+    val itemWidth = if (compact) 78.dp else 112.dp
 
     Row(
         modifier = modifier
-            .width(if (compact) 228.dp else 504.dp)
+            .width((itemWidth * destinations.size) + (gap * (destinations.size - 1)) + (horizontalPadding * 2))
             .height(height)
             .background(QingkuiDarkSurface, RoundedCornerShape(28.dp))
             .padding(horizontal = horizontalPadding, vertical = if (compact) 6.dp else 8.dp),

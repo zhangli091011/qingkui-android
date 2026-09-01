@@ -62,6 +62,123 @@ data class HealthDto(
     @SerializedName("ai_ready") val aiReady: Boolean,
 )
 
+data class WorkspaceCapabilitiesDto(
+    @SerializedName("student_workspace") val studentWorkspace: Boolean = true,
+    @SerializedName("teacher_workspace") val teacherWorkspace: Boolean = false,
+    @SerializedName("content_workspace") val contentWorkspace: Boolean = false,
+    @SerializedName("operations_workspace") val operationsWorkspace: Boolean = false,
+    @SerializedName("raw_student_content") val rawStudentContent: Boolean = false,
+)
+
+data class WorkspaceUserDto(
+    val id: String,
+    val username: String,
+    val nickname: String,
+    val role: String,
+)
+
+data class WorkspaceMeDto(
+    val schema: String = "",
+    val user: WorkspaceUserDto,
+    val roles: List<String> = emptyList(),
+    val scope: String = "self_only",
+    @SerializedName("school_ids") val schoolIds: List<String> = emptyList(),
+    val capabilities: WorkspaceCapabilitiesDto = WorkspaceCapabilitiesDto(),
+    @SerializedName("data_scope_user_count") val dataScopeUserCount: Int? = null,
+)
+
+data class WorkspaceOcrQueueDto(
+    val queued: Int = 0,
+    val processing: Int = 0,
+    val failed: Int = 0,
+    @SerializedName("needs_review") val needsReview: Int = 0,
+)
+
+data class WorkspaceMetricsDto(
+    @SerializedName("active_students") val activeStudents: Int = 0,
+    @SerializedName("seven_day_return_rate") val sevenDayReturnRate: Double = 0.0,
+    @SerializedName("mistake_upload_success_rate") val mistakeUploadSuccessRate: Double = 0.0,
+    @SerializedName("ocr_correction_rate") val ocrCorrectionRate: Double = 0.0,
+    @SerializedName("ocr_queue") val ocrQueue: WorkspaceOcrQueueDto = WorkspaceOcrQueueDto(),
+    @SerializedName("mistake_analysis_completion_rate") val mistakeAnalysisCompletionRate: Double = 0.0,
+    @SerializedName("same_practice_completion_rate") val samePracticeCompletionRate: Double = 0.0,
+    @SerializedName("second_attempt_accuracy") val secondAttemptAccuracy: Double = 0.0,
+    @SerializedName("ai_helpful_rate") val aiHelpfulRate: Double = 0.0,
+    @SerializedName("ai_calls") val aiCalls: Int = 0,
+    @SerializedName("ai_failed_calls") val aiFailedCalls: Int = 0,
+    @SerializedName("ai_failure_rate") val aiFailureRate: Double = 0.0,
+    @SerializedName("average_user_cost_tokens") val averageUserCostTokens: Double = 0.0,
+    @SerializedName("mistakes_created") val mistakesCreated: Int = 0,
+    @SerializedName("error_categories") val errorCategories: Map<String, Int> = emptyMap(),
+    @SerializedName("due_reviews") val dueReviews: Int = 0,
+    @SerializedName("pending_content") val pendingContent: Int? = null,
+    @SerializedName("pending_formulas") val pendingFormulas: Int? = null,
+    @SerializedName("approved_nodes") val approvedNodes: Int? = null,
+    @SerializedName("security_events") val securityEvents: Int = 0,
+)
+
+data class WorkspaceRangeDto(
+    @SerializedName("start_at") val startAt: String = "",
+    @SerializedName("end_at") val endAt: String = "",
+    val days: Int = 0,
+)
+
+data class WorkspaceDashboardDto(
+    val schema: String = "",
+    @SerializedName("generated_at") val generatedAt: String = "",
+    val range: WorkspaceRangeDto = WorkspaceRangeDto(),
+    val filters: Map<String, String?> = emptyMap(),
+    val viewer: Map<String, Any?> = emptyMap(),
+    val metrics: WorkspaceMetricsDto = WorkspaceMetricsDto(),
+    val alerts: WorkspaceAlertsDto = WorkspaceAlertsDto(),
+)
+
+data class WorkspaceAlertDto(
+    val severity: String = "warning",
+    val code: String = "",
+    val message: String = "",
+    val value: Double? = null,
+    val threshold: Double? = null,
+)
+
+data class WorkspaceAlertsDto(
+    val status: String = "ok",
+    val alerts: List<WorkspaceAlertDto> = emptyList(),
+    @SerializedName("release_blockers") val releaseBlockers: List<WorkspaceAlertDto> = emptyList(),
+    val restricted: Boolean = false,
+)
+
+data class WorkspaceTaskDto(
+    @SerializedName("task_type") val taskType: String = "",
+    val id: String = "",
+    val status: String = "",
+    @SerializedName("requires_review") val requiresReview: Boolean = false,
+    @SerializedName("created_at") val createdAt: String = "",
+    @SerializedName("updated_at") val updatedAt: String? = null,
+    @SerializedName("error_code") val errorCode: String? = null,
+    val scope: String? = null,
+)
+
+data class WorkspaceTasksDto(
+    val schema: String = "",
+    val scope: String = "",
+    val items: List<WorkspaceTaskDto> = emptyList(),
+)
+
+data class WorkspaceActivityDto(
+    val id: String = "",
+    val action: String = "",
+    @SerializedName("target_type") val targetType: String? = null,
+    @SerializedName("target_id") val targetId: String? = null,
+    @SerializedName("created_at") val createdAt: String = "",
+)
+
+data class WorkspaceActivityResponseDto(
+    val schema: String = "",
+    val scope: String = "",
+    val items: List<WorkspaceActivityDto> = emptyList(),
+)
+
 data class CreditCampaignDto(
     val id: String,
     val name: String,

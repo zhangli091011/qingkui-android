@@ -75,6 +75,11 @@ import cn.qingkui.app.ui.model.QaClarificationOption
 import cn.qingkui.app.ui.model.RelationType
 import cn.qingkui.app.ui.model.SchoolClassItem
 import cn.qingkui.app.ui.model.SchoolMembershipItem
+import cn.qingkui.app.ui.model.WorkspaceAlert
+import cn.qingkui.app.ui.model.WorkspaceCapabilities
+import cn.qingkui.app.ui.model.WorkspaceDashboard
+import cn.qingkui.app.ui.model.WorkspaceMetricSnapshot
+import cn.qingkui.app.ui.model.WorkspaceTask
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import kotlinx.coroutines.delay
@@ -115,6 +120,10 @@ class ApiFailureException(val statusCode: Int?, message: String) : Exception(mes
 
 interface AppRepository {
     suspend fun serviceAvailability(): ServiceAvailability = ServiceAvailability(aiAvailable = true)
+    suspend fun workspaceMe(): Pair<WorkspaceCapabilities, List<String>> = WorkspaceCapabilities() to emptyList()
+    suspend fun workspaceDashboard(): WorkspaceDashboard = WorkspaceDashboard()
+    suspend fun workspaceTasks(): List<WorkspaceTask> = emptyList()
+    suspend fun workspaceAlerts(): List<WorkspaceAlert> = emptyList()
     suspend fun hasSession(): Boolean
     suspend fun nickname(): String?
     suspend fun login(username: String, password: String): String
@@ -209,6 +218,59 @@ class NetworkAppRepository(
             aiAvailable = available,
             message = if (available) null else "AI 服务维护中，浏览和已有学习记录仍可使用",
         )
+    }
+
+    override suspend fun workspaceMe(): Pair<WorkspaceCapabilities, List<String>> = apiCall {
+        val value = api.workspaceMe()
+        WorkspaceCapabilities(
+            studentWorkspace = value.capabilities.studentWorkspace,
+            teacherWorkspace = value.capabilities.teacherWorkspace,
+            contentWorkspace = value.capabilities.contentWorkspace,
+            operationsWorkspace = value.capabilities.operationsWorkspace,
+            rawStudentContent = value.capabilities.rawStudentContent,
+        ) to value.roles
+    }
+
+    override suspend fun workspaceDashboard(): WorkspaceDashboard = apiCall {
+        val value = api.workspaceDashboard()
+        val m = value.metrics
+        WorkspaceDashboard(
+            generatedAt = value.generatedAt.displayDateTime(),
+            rangeLabel = "近 ${value.range.days.coerceAtLeast(1)} 天",
+            metrics = WorkspaceMetricSnapshot(
+                activeStudents = m.activeStudents,
+                sevenDayReturnRate = m.sevenDayReturnRate,
+                mistakeUploadSuccessRate = m.mistakeUploadSuccessRate,
+                ocrCorrectionRate = m.ocrCorrectionRate,
+                queuedOcr = m.ocrQueue.queued,
+                processingOcr = m.ocrQueue.processing,
+                failedOcr = m.ocrQueue.failed,
+                ocrNeedsReview = m.ocrQueue.needsReview,
+                mistakeAnalysisCompletionRate = m.mistakeAnalysisCompletionRate,
+                samePracticeCompletionRate = m.samePracticeCompletionRate,
+                secondAttemptAccuracy = m.secondAttemptAccuracy,
+                aiHelpfulRate = m.aiHelpfulRate,
+                aiFailureRate = m.aiFailureRate,
+                averageUserCostTokens = m.averageUserCostTokens,
+                pendingContent = m.pendingContent,
+                pendingFormulas = m.pendingFormulas,
+                approvedNodes = m.approvedNodes,
+                securityEvents = m.securityEvents,
+            ),
+            alerts = value.alerts.alerts.map { WorkspaceAlert(it.severity, it.code, it.message, it.value) },
+            releaseBlockers = value.alerts.releaseBlockers.map { WorkspaceAlert(it.severity, it.code, it.message, it.value) },
+        )
+    }
+
+    override suspend fun workspaceTasks(): List<WorkspaceTask> = apiCall {
+        api.workspaceTasks().items.map {
+            WorkspaceTask(it.taskType, it.id, it.status, it.requiresReview, it.createdAt.displayDateTime(), it.errorCode)
+        }
+    }
+
+    override suspend fun workspaceAlerts(): List<WorkspaceAlert> = apiCall {
+        val value = api.workspaceAlerts()
+        (value.alerts + value.releaseBlockers).map { WorkspaceAlert(it.severity, it.code, it.message, it.value) }
     }
 
     override suspend fun hasSession(): Boolean = tokenStore.refreshToken() != null
