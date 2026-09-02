@@ -76,10 +76,10 @@ fun AppTopBar(
             selected = selected,
             compact = compact,
             onSelect = onSelect,
-            showWorkspace = showWorkspace,
-            showTeacher = showTeacher,
-            showContent = showContent,
-            showOperations = showOperations,
+            showWorkspace = false,
+            showTeacher = false,
+            showContent = false,
+            showOperations = false,
         )
 
         if (compact) {

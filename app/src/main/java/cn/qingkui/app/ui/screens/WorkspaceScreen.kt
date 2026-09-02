@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -95,7 +96,7 @@ fun WorkspaceScreen(
         }
         item { SectionTitle("风险告警", alerts.size) }
         if (alerts.isEmpty()) item { Text("当前没有需要处理的告警", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        items(alerts, key = { it.code }) { AlertRow(it) }
+        itemsIndexed(alerts, key = { index, alert -> alert.code.ifBlank { "alert-$index" } }) { _, alert -> AlertRow(alert) }
         item { SectionTitle("待办任务", tasks.size) }
         if (tasks.isEmpty()) item { Text("当前没有待办任务", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         items(tasks, key = { "${it.type}-${it.id}" }) { TaskRow(it) }

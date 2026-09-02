@@ -37,10 +37,6 @@ fun DynamicIslandNav(
     modifier: Modifier = Modifier,
 ) {
     val destinations = buildList {
-        if (showWorkspace) add(AppDestination.Workspace)
-        if (showTeacher) add(AppDestination.Teacher)
-        if (showContent) add(AppDestination.Content)
-        if (showOperations) add(AppDestination.Operations)
         addAll(listOf(AppDestination.Chat, AppDestination.Graph, AppDestination.Learning))
         add(AppDestination.Mistakes)
         if (!compact) add(AppDestination.Account)

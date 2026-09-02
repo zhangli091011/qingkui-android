@@ -41,6 +41,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import cn.qingkui.app.ui.model.DeviceSessionItem
+import cn.qingkui.app.ui.model.WorkspaceCapabilities
+import cn.qingkui.app.ui.model.AppDestination
 import cn.qingkui.app.ui.model.FeedbackItem
 import cn.qingkui.app.ui.model.ClassOverviewItem
 import cn.qingkui.app.ui.model.ContributionItem
@@ -91,6 +93,8 @@ fun AccountScreen(
     onRedeemCreditCode: (String) -> Unit = {},
     onSubmitContribution: (String, String, String, String?) -> Unit = { _, _, _, _ -> },
     onDeleteContribution: (String) -> Unit = {},
+    workspaceCapabilities: WorkspaceCapabilities = WorkspaceCapabilities(),
+    onOpenWorkspace: (AppDestination) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var passwordDialog by remember { mutableStateOf(false) }
@@ -192,6 +196,20 @@ fun AccountScreen(
             SettingsRow(Icons.Outlined.DataUsage, "数据说明", "学习记录、错题和删除范围", onClick = { dataDialog = true })
             SettingsRow(Icons.Outlined.PrivacyTip, "隐私说明", "账户、图片与模型调用边界", onClick = { privacyDialog = true })
             SettingsRow(Icons.Outlined.School, "未成年人及试点", "授权、教师可见范围与退出方式", onClick = { minorDialog = true })
+            if (authenticated && (workspaceCapabilities.teacherWorkspace || workspaceCapabilities.contentWorkspace || workspaceCapabilities.operationsWorkspace)) {
+                Spacer(Modifier.height(8.dp))
+                Text("工作台", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (workspaceCapabilities.teacherWorkspace) {
+                    SettingsRow(Icons.Outlined.Groups, "教师工作台", "班级趋势与知识点聚合", onClick = { onOpenWorkspace(AppDestination.Teacher) })
+                }
+                if (workspaceCapabilities.contentWorkspace) {
+                    SettingsRow(Icons.Outlined.DataUsage, "内容治理", "文档、公式、节点、关系与发布", onClick = { onOpenWorkspace(AppDestination.Content) })
+                }
+                if (workspaceCapabilities.operationsWorkspace) {
+                    SettingsRow(Icons.Outlined.Devices, "系统运维", "队列、告警、审计与发布门", onClick = { onOpenWorkspace(AppDestination.Operations) })
+                    SettingsRow(Icons.Outlined.Brightness6, "运营驾驶舱", "指标、趋势、待办与风险", onClick = { onOpenWorkspace(AppDestination.Workspace) })
+                }
+            }
             SettingsRow(Icons.Outlined.Groups, "校园与共建", "学校班级、活动额度与内容投稿", onClick = {
                 if (authenticated) {
                     onRefreshCommunity()

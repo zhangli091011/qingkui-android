@@ -316,6 +316,8 @@ fun QingkuiApp() {
                         onRedeemCreditCode = viewModel::redeemCreditCode,
                         onSubmitContribution = viewModel::submitContribution,
                         onDeleteContribution = viewModel::deleteContribution,
+                        workspaceCapabilities = uiState.workspaceCapabilities,
+                        onOpenWorkspace = viewModel::selectDestination,
                     )
                 }
             }
