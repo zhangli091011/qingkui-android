@@ -38,6 +38,7 @@ import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.CenterFocusStrong
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
@@ -114,6 +115,7 @@ fun KnowledgeGraphScreen(
     relations: List<KnowledgeRelation>,
     selectedNodeId: String?,
     onSelectNode: (String) -> Unit,
+    onClearSelection: () -> Unit = {},
     onAskNode: (String) -> Unit,
     onMarkStatus: (KnowledgeStatus) -> Unit = {},
     onToggleFavorite: () -> Unit = {},
@@ -164,49 +166,38 @@ fun KnowledgeGraphScreen(
         }
         Spacer(Modifier.height(12.dp))
 
-        if (compact) {
+        Box(Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
             GraphContent(
-                displayMode, visibleNodes, nodes, relations, relationFilter, selectedNodeId, chapters, onSelectNode,
-                Modifier.fillMaxWidth().weight(1f),
+                displayMode,
+                visibleNodes,
+                nodes,
+                relations,
+                relationFilter,
+                selectedNodeId,
+                chapters,
+                onSelectNode,
+                onClearSelection,
+                Modifier.fillMaxSize(),
             )
             selectedNode?.let { node ->
-                Spacer(Modifier.height(12.dp))
                 NodeDetailPanel(
                     node = node,
                     nodes = nodes,
                     relations = relations,
-                    compact = true,
+                    compact = compact,
                     onAsk = { onAskNode(node.id) },
+                    onDismiss = onClearSelection,
                     onMarkStatus = onMarkStatus,
                     onToggleFavorite = onToggleFavorite,
                     onStartUnderstandingCheck = onStartUnderstandingCheck,
                     note = note,
                     onNoteChange = onNoteChange,
-                    modifier = Modifier.fillMaxWidth().height(330.dp),
+                    modifier = if (compact) {
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth().heightIn(max = 370.dp).padding(8.dp)
+                    } else {
+                        Modifier.align(Alignment.TopEnd).width(360.dp).heightIn(max = 540.dp).padding(12.dp)
+                    },
                 )
-            }
-        } else {
-            Row(Modifier.fillMaxSize()) {
-                GraphContent(
-                    displayMode, visibleNodes, nodes, relations, relationFilter, selectedNodeId, chapters, onSelectNode,
-                    Modifier.weight(1f).fillMaxHeight(),
-                )
-                selectedNode?.let { node ->
-                    Spacer(Modifier.width(20.dp))
-                    NodeDetailPanel(
-                        node = node,
-                        nodes = nodes,
-                        relations = relations,
-                        compact = false,
-                        onAsk = { onAskNode(node.id) },
-                        onMarkStatus = onMarkStatus,
-                        onToggleFavorite = onToggleFavorite,
-                        onStartUnderstandingCheck = onStartUnderstandingCheck,
-                        note = note,
-                        onNoteChange = onNoteChange,
-                        modifier = Modifier.width(340.dp).fillMaxHeight(),
-                    )
-                }
             }
         }
     }
@@ -421,10 +412,11 @@ private fun GraphContent(
     selectedNodeId: String?,
     chapters: List<KnowledgeTreeChapter>,
     onSelectNode: (String) -> Unit,
+    onClearSelection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (displayMode) {
-        GraphDisplayMode.Graph -> GraphCanvas(nodes, allNodes, relations, relationFilter, selectedNodeId, onSelectNode, modifier)
+        GraphDisplayMode.Graph -> GraphCanvas(nodes, allNodes, relations, relationFilter, selectedNodeId, onSelectNode, onClearSelection, modifier)
         GraphDisplayMode.Cards -> KnowledgeCardGrid(nodes, selectedNodeId, onSelectNode, modifier)
         GraphDisplayMode.Outline -> KnowledgeOutline(chapters, selectedNodeId, onSelectNode, modifier)
     }
@@ -524,6 +516,7 @@ private fun GraphCanvas(
     relationFilter: RelationType?,
     selectedNodeId: String?,
     onSelectNode: (String) -> Unit,
+    onClearSelection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var zoomFactor by remember { mutableFloatStateOf(1f) }
@@ -564,13 +557,14 @@ private fun GraphCanvas(
                 .pointerInput(nodes, viewport, zoomFactor, translation) {
                     detectTapGestures { tap ->
                         val graphTap = (tap - translation) / zoomFactor
-                        nodes.minByOrNull { node ->
+                        val selected = nodes.minByOrNull { node ->
                             val point = Offset(viewport.width * node.x, viewport.height * node.y)
                             (graphTap - point).getDistance()
                         }?.takeIf { node ->
                             val point = Offset(viewport.width * node.x, viewport.height * node.y)
                             (graphTap - point).getDistance() <= hitRadiusPx
-                        }?.let { onSelectNode(it.id) }
+                        }
+                        if (selected != null) onSelectNode(selected.id) else onClearSelection()
                     }
                 },
         ) {
@@ -761,6 +755,7 @@ private fun NodeDetailPanel(
     relations: List<KnowledgeRelation>,
     compact: Boolean,
     onAsk: () -> Unit,
+    onDismiss: () -> Unit,
     onMarkStatus: (KnowledgeStatus) -> Unit,
     onToggleFavorite: () -> Unit,
     onStartUnderstandingCheck: () -> Unit,
@@ -791,6 +786,11 @@ private fun NodeDetailPanel(
                 onClick = onToggleFavorite,
                 containerColor = if (node.saved) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                 contentColor = if (node.saved) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+            )
+            QkIconButton(
+                imageVector = Icons.Outlined.Close,
+                contentDescription = "关闭节点信息",
+                onClick = onDismiss,
             )
         }
         Spacer(Modifier.height(14.dp))

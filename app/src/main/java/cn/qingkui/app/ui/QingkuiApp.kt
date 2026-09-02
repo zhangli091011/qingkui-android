@@ -152,19 +152,17 @@ fun QingkuiApp() {
                 )
             }
             Column(Modifier.fillMaxSize()) {
-                if (uiState.destination != AppDestination.Graph) {
-                    AppTopBar(
-                        selected = uiState.destination,
-                        credits = uiState.credits,
-                        compact = compact,
-                        onMenuClick = { viewModel.setDrawerOpen(true) },
-                        onSelect = viewModel::selectDestination,
-                        showWorkspace = uiState.workspaceCapabilities.contentWorkspace || uiState.workspaceCapabilities.operationsWorkspace,
-                        showTeacher = uiState.workspaceCapabilities.teacherWorkspace,
-                        showContent = uiState.workspaceCapabilities.contentWorkspace,
-                        showOperations = uiState.workspaceCapabilities.operationsWorkspace,
-                    )
-                }
+                AppTopBar(
+                    selected = uiState.destination,
+                    credits = uiState.credits,
+                    compact = compact,
+                    onMenuClick = { viewModel.setDrawerOpen(true) },
+                    onSelect = viewModel::selectDestination,
+                    showWorkspace = false,
+                    showTeacher = false,
+                    showContent = false,
+                    showOperations = false,
+                )
                 if (uiState.contentLoading) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
@@ -238,6 +236,7 @@ fun QingkuiApp() {
                         relations = uiState.graphRelations,
                         selectedNodeId = uiState.selectedNodeId,
                         onSelectNode = viewModel::selectNode,
+                        onClearSelection = viewModel::clearSelectedNode,
                         onAskNode = viewModel::askAboutNode,
                         onMarkStatus = viewModel::markNodeStatus,
                         onToggleFavorite = viewModel::toggleFavorite,

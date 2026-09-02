@@ -841,6 +841,17 @@ class AppViewModel(
         }
     }
 
+    fun clearSelectedNode() {
+        _uiState.update {
+            it.copy(
+                selectedNodeId = null,
+                selectedNodeDetail = null,
+                noteDraft = "",
+                understandingCheck = null,
+            )
+        }
+    }
+
     fun markNodeStatus(status: KnowledgeStatus) {
         val nodeId = _uiState.value.selectedNodeId ?: return
         viewModelScope.launch {
