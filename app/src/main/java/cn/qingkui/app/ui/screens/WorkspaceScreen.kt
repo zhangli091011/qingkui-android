@@ -158,10 +158,16 @@ fun WorkspaceScreen(
 }
 
 @Composable private fun AlertRow(alert: WorkspaceAlert) {
-    Card(colors = CardDefaults.cardColors(containerColor = if (alert.severity == "critical") MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant)) {
+    val isCritical = alert.severity.equals("critical", ignoreCase = true)
+    val message = alert.message.ifBlank { "该告警暂未提供详细说明" }
+    val code = alert.code.ifBlank { "未命名告警" }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = if (isCritical) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant),
+    ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(alert.message, fontWeight = FontWeight.Medium)
-            Text("${alert.code}${alert.value?.let { " · ${String.format(Locale.US, "%.2f", it)}" }.orEmpty()}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(message, fontWeight = FontWeight.Medium)
+            Text("${code}${alert.value?.let { " · ${String.format(Locale.US, "%.2f", it)}" }.orEmpty()}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

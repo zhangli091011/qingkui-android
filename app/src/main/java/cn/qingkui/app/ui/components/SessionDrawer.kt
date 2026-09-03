@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.History
@@ -53,7 +54,11 @@ fun SessionDrawer(
         modifier = Modifier.width(336.dp).fillMaxHeight(),
         color = MaterialTheme.colorScheme.surface,
     ) {
-        Column(Modifier.padding(horizontal = 24.dp, vertical = 32.dp)) {
+        Column(
+            Modifier
+                .padding(horizontal = 24.dp, vertical = 32.dp)
+                .navigationBarsPadding(),
+        ) {
             Text("青葵计划", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(
                 "学习会话",

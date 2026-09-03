@@ -24,9 +24,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items as lazyItems
+import androidx.compose.foundation.lazy.itemsIndexed as lazyItemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -446,7 +448,7 @@ private fun KnowledgeOutline(
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
-        lazyItems(chapters, key = { it.name }) { chapter ->
+        lazyItemsIndexed(chapters, key = { index, chapter -> "${chapter.name}-$index" }) { _, chapter ->
             ChapterRow(chapter, selectedNodeId, onSelectNode)
         }
     }
@@ -704,7 +706,7 @@ private fun KnowledgeCardGrid(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(nodes, key = { it.id }) { node ->
+        itemsIndexed(nodes, key = { index, node -> "${node.id}-$index" }) { _, node ->
             KnowledgeExplorerCard(node, selected = node.id == selectedNodeId, onClick = { onSelectNode(node.id) })
         }
     }

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -141,7 +142,7 @@ fun LearningScreen(
                     }
                 } else {
                     LazyColumn {
-                        items(items, key = { it.nodeId }) { item ->
+                        itemsIndexed(items, key = { index, item -> "${item.nodeId}-$index" }) { _, item ->
                             KnowledgeStateRow(item = item, onClick = { onOpenItem(item.nodeId) })
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                         }
