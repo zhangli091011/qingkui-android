@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PrivacyTip
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Button
@@ -95,6 +96,7 @@ fun AccountScreen(
     onDeleteContribution: (String) -> Unit = {},
     workspaceCapabilities: WorkspaceCapabilities = WorkspaceCapabilities(),
     onOpenWorkspace: (AppDestination) -> Unit = {},
+    onOpenAdminConsole: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var passwordDialog by remember { mutableStateOf(false) }
@@ -209,6 +211,7 @@ fun AccountScreen(
                     SettingsRow(Icons.Outlined.Devices, "系统运维", "队列、告警、审计与发布门", onClick = { onOpenWorkspace(AppDestination.Operations) })
                     SettingsRow(Icons.Outlined.Brightness6, "运营驾驶舱", "指标、趋势、待办与风险", onClick = { onOpenWorkspace(AppDestination.Workspace) })
                 }
+                SettingsRow(Icons.Outlined.Settings, "完整管理控制台", "在应用内执行审核、发布、权限、额度和运维操作", onClick = onOpenAdminConsole)
             }
             SettingsRow(Icons.Outlined.Groups, "校园与共建", "学校班级、活动额度与内容投稿", onClick = {
                 if (authenticated) {

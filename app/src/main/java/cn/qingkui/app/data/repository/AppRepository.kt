@@ -120,6 +120,7 @@ class ApiFailureException(val statusCode: Int?, message: String) : Exception(mes
 
 interface AppRepository {
     suspend fun serviceAvailability(): ServiceAvailability = ServiceAvailability(aiAvailable = true)
+    suspend fun accessToken(): String? = null
     suspend fun workspaceMe(): Pair<WorkspaceCapabilities, List<String>> = WorkspaceCapabilities() to emptyList()
     suspend fun workspaceDashboard(): WorkspaceDashboard = WorkspaceDashboard()
     suspend fun workspaceTasks(): List<WorkspaceTask> = emptyList()
@@ -210,6 +211,8 @@ class NetworkAppRepository(
 ) : AppRepository {
     private val gson = Gson()
     private val draftDao = MistakeDatabase.get(context).drafts()
+
+    override suspend fun accessToken(): String? = tokenStore.accessToken()
 
     override suspend fun serviceAvailability(): ServiceAvailability = apiCall {
         val health = api.health()

@@ -46,6 +46,7 @@ import cn.qingkui.app.ui.screens.KnowledgeGraphScreen
 import cn.qingkui.app.ui.screens.LearningScreen
 import cn.qingkui.app.ui.screens.MistakeCaptureScreen
 import cn.qingkui.app.ui.screens.WorkspaceScreen
+import cn.qingkui.app.ui.screens.AdminConsoleScreen
 
 @Composable
 fun QingkuiApp() {
@@ -177,6 +178,10 @@ fun QingkuiApp() {
                         alerts = uiState.workspaceAlerts,
                         compact = compact,
                         onRefresh = viewModel::refreshWorkspace,
+                    )
+                    AppDestination.AdminConsole -> AdminConsoleScreen(
+                        accessToken = uiState.adminAccessToken,
+                        onClose = { viewModel.selectDestination(AppDestination.Account) },
                     )
                     AppDestination.Mistakes -> LearningScreen(
                         compact = compact,
@@ -317,6 +322,7 @@ fun QingkuiApp() {
                         onDeleteContribution = viewModel::deleteContribution,
                         workspaceCapabilities = uiState.workspaceCapabilities,
                         onOpenWorkspace = viewModel::selectDestination,
+                        onOpenAdminConsole = viewModel::openAdminConsole,
                     )
                 }
             }

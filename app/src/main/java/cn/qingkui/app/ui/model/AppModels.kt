@@ -7,6 +7,7 @@ enum class AppDestination(val label: String) {
     Teacher("班级"),
     Content("内容"),
     Operations("运行"),
+    AdminConsole("管理控制台"),
     Mistakes("错题"),
     Chat("问答"),
     Graph("图谱"),
@@ -501,4 +502,5 @@ data class AppUiState(
     val workspaceDashboard: WorkspaceDashboard? = null,
     val workspaceTasks: List<WorkspaceTask> = emptyList(),
     val workspaceAlerts: List<WorkspaceAlert> = emptyList(),
+    val adminAccessToken: String? = null,
 )

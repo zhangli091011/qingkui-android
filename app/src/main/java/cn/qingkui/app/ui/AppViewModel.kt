@@ -194,10 +194,12 @@ class AppViewModel(
                 val dashboard = repository.workspaceDashboard()
                 val tasks = repository.workspaceTasks()
                 val alerts = repository.workspaceAlerts()
+                val accessToken = repository.accessToken()
                 _uiState.update {
                     it.copy(
                         workspaceCapabilities = capabilities,
                         workspaceRoles = roles,
+                        adminAccessToken = accessToken,
                         workspaceDashboard = dashboard,
                         workspaceTasks = tasks,
                         workspaceAlerts = alerts,
@@ -416,6 +418,13 @@ class AppViewModel(
     fun selectDestination(destination: AppDestination) {
         _uiState.update { it.copy(destination = destination, drawerOpen = false) }
         reconcileMistakePolling(_uiState.value.mistakes)
+    }
+
+    fun openAdminConsole() {
+        viewModelScope.launch {
+            val token = repository.accessToken()
+            _uiState.update { it.copy(adminAccessToken = token, destination = AppDestination.AdminConsole, drawerOpen = false) }
+        }
     }
 
     fun showLearningRecords() {
