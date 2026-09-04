@@ -139,14 +139,20 @@ fun KnowledgeGraphScreen(
     var displayMode by remember { mutableStateOf(GraphDisplayMode.Graph) }
     var relationFilter by remember { mutableStateOf<RelationType?>(null) }
     var searchQuery by remember { mutableStateOf("") }
-    val visibleNodes = remember(nodes, searchQuery) {
-        if (searchQuery.isBlank()) nodes else nodes.filter {
+    // The API can contain the same concept under multiple source records. Present one
+    // canonical node and remap its branches so the canvas remains readable.
+    val canonicalData = remember(nodes, relations) { canonicalizeGraph(nodes, relations) }
+    val canonicalNodes = canonicalData.first
+    val canonicalRelations = canonicalData.second
+    val canonicalSelectedId = canonicalData.third[selectedNodeId] ?: selectedNodeId
+    val visibleNodes = remember(canonicalNodes, searchQuery) {
+        if (searchQuery.isBlank()) canonicalNodes else canonicalNodes.filter {
             it.title.contains(searchQuery, ignoreCase = true) ||
                 it.subtitle.contains(searchQuery, ignoreCase = true) ||
                 it.description.contains(searchQuery, ignoreCase = true)
         }
     }
-    val selectedNode = nodes.firstOrNull { it.id == selectedNodeId }
+    val selectedNode = canonicalNodes.firstOrNull { it.id == canonicalSelectedId }
     LaunchedEffect(searchQuery) {
         kotlinx.coroutines.delay(280)
         onSearch(searchQuery)
@@ -172,10 +178,10 @@ fun KnowledgeGraphScreen(
             GraphContent(
                 displayMode,
                 visibleNodes,
-                nodes,
-                relations,
+                canonicalNodes,
+                canonicalRelations,
                 relationFilter,
-                selectedNodeId,
+                canonicalSelectedId,
                 chapters,
                 onSelectNode,
                 onClearSelection,
@@ -184,8 +190,8 @@ fun KnowledgeGraphScreen(
             selectedNode?.let { node ->
                 NodeDetailPanel(
                     node = node,
-                    nodes = nodes,
-                    relations = relations,
+                    nodes = canonicalNodes,
+                    relations = canonicalRelations,
                     compact = compact,
                     onAsk = { onAskNode(node.id) },
                     onDismiss = onClearSelection,
@@ -211,6 +217,30 @@ fun KnowledgeGraphScreen(
             onDismiss = onDismissUnderstandingCheck,
         )
     }
+}
+
+private fun canonicalizeGraph(
+    nodes: List<KnowledgeNode>,
+    relations: List<KnowledgeRelation>,
+): Triple<List<KnowledgeNode>, List<KnowledgeRelation>, Map<String, String>> {
+    val idMap = linkedMapOf<String, String>()
+    val unique = linkedMapOf<String, KnowledgeNode>()
+    nodes.forEach { node ->
+        val key = node.title.trim().lowercase().ifBlank { node.id }
+        val canonical = unique[key]
+        if (canonical == null) {
+            unique[key] = node
+            idMap[node.id] = node.id
+        } else {
+            idMap[node.id] = canonical.id
+        }
+    }
+    val mergedRelations = relations.mapNotNull { relation ->
+        val from = idMap[relation.fromId] ?: relation.fromId
+        val to = idMap[relation.toId] ?: relation.toId
+        if (from == to) null else relation.copy(fromId = from, toId = to)
+    }.distinctBy { Triple(it.fromId, it.toId, it.type) }
+    return Triple(unique.values.toList(), mergedRelations, idMap)
 }
 
 @Composable

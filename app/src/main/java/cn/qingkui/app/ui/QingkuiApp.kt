@@ -178,6 +178,7 @@ fun QingkuiApp() {
                         alerts = uiState.workspaceAlerts,
                         compact = compact,
                         onRefresh = viewModel::refreshWorkspace,
+                        onOpenAdminConsole = viewModel::openAdminConsole,
                     )
                     AppDestination.AdminConsole -> AdminConsoleScreen(
                         accessToken = uiState.adminAccessToken,

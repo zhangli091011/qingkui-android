@@ -7,12 +7,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,6 +27,9 @@ import cn.qingkui.app.ui.model.WorkspaceDashboard
 import cn.qingkui.app.ui.model.WorkspaceTask
 import cn.qingkui.app.ui.model.AppDestination
 import java.util.Locale
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.Rule
 
 @Composable
 fun WorkspaceScreen(
@@ -33,6 +39,7 @@ fun WorkspaceScreen(
     alerts: List<WorkspaceAlert>,
     compact: Boolean,
     onRefresh: () -> Unit,
+    onOpenAdminConsole: () -> Unit = {},
 ) {
     val metrics = dashboard?.metrics
     LazyColumn(
@@ -87,7 +94,7 @@ fun WorkspaceScreen(
             }
             item {
                 when (destination) {
-                    AppDestination.Content -> ContentGovernanceCard(metrics.pendingContent, metrics.pendingFormulas, metrics.approvedNodes, metrics.documents, metrics.knowledgeEdges)
+                    AppDestination.Content -> ContentGovernanceCard(metrics.pendingContent, metrics.pendingFormulas, metrics.approvedNodes, metrics.documents, metrics.knowledgeEdges, onOpenAdminConsole)
                     AppDestination.Operations -> OperationsCard(metrics.queuedOcr, metrics.processingOcr, metrics.failedOcr, metrics.aiFailureRate, metrics.auditEvents, metrics.releaseGatePassed)
                     AppDestination.Teacher -> TeacherSummaryCard(metrics.activeStudents, metrics.mistakesCreated, metrics.samePracticeCompletionRate, metrics.secondAttemptAccuracy)
                     else -> QueueCard(metrics.queuedOcr, metrics.processingOcr, metrics.failedOcr, metrics.ocrNeedsReview)
@@ -103,13 +110,25 @@ fun WorkspaceScreen(
     }
 }
 
-@Composable private fun ContentGovernanceCard(pending: Int?, formulas: Int?, approved: Int?, documents: Int?, edges: Int?) {
+@Composable private fun ContentGovernanceCard(pending: Int?, formulas: Int?, approved: Int?, documents: Int?, edges: Int?, onOpenAdminConsole: () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("内容治理", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text("文档 ${documents?.toString() ?: "受限"}  · 待审核节点 ${pending?.toString() ?: "受限"}  · 公式队列 ${formulas?.toString() ?: "受限"}")
             Text("正式节点 ${approved?.toString() ?: "受限"}  · 知识关系 ${edges?.toString() ?: "受限"}")
             Text("文档、公式、知识点、关系和版本发布均由后端权限接口校验", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onOpenAdminConsole) {
+                    Icon(Icons.Outlined.Rule, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("审核节点")
+                }
+                Button(onClick = onOpenAdminConsole) {
+                    Icon(Icons.Outlined.Hub, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("审核关系")
+                }
+            }
         }
     }
 }
