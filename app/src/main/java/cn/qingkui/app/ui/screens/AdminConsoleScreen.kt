@@ -110,7 +110,7 @@ fun AdminConsoleScreen(
 private fun injectAdminToken(webView: WebView, accessToken: String?) {
     val tokenLiteral = JSONObject.quote(accessToken.orEmpty())
     webView.evaluateJavascript(
-        "var i=document.getElementById('token'); if(i) i.value=$tokenLiteral; sessionStorage.setItem('adminToken', $tokenLiteral); if (typeof saveToken === 'function') saveToken(); else { var s=document.getElementById('status'); if(s) s.textContent='令牌已注入'; }",
+        "try { var i=document.getElementById('token'); if(i) i.value=$tokenLiteral; sessionStorage.setItem('adminToken', $tokenLiteral); if (typeof saveToken === 'function') saveToken(); else { var s=document.getElementById('status'); if(s) s.textContent='令牌已注入'; } } catch(e) {}",
         null,
     )
 }
