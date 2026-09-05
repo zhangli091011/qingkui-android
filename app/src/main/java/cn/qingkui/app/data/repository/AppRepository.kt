@@ -474,7 +474,11 @@ class NetworkAppRepository(
         GraphData(
             nodes = listOf(center) + neighbors,
             relations = response.nodes.map { node ->
-                KnowledgeRelation(center.id, node.id, node.edgeType.toRelationType())
+                if (node.edgeOutgoing) {
+                    KnowledgeRelation(center.id, node.id, node.edgeType.toRelationType())
+                } else {
+                    KnowledgeRelation(node.id, center.id, node.edgeType.toRelationType())
+                }
             },
             selectedNodeId = center.id,
         )

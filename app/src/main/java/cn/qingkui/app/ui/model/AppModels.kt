@@ -467,6 +467,10 @@ data class AppUiState(
     val currentSubject: String = "数学",
     val graphNodes: List<KnowledgeNode> = emptyList(),
     val graphRelations: List<KnowledgeRelation> = emptyList(),
+    /** The node anchored at the visual centre of the graph. This is independent
+     * from selectedNodeId, which represents the node currently shown in the
+     * floating detail card. */
+    val graphCenterNodeId: String? = null,
     val knowledgeCatalog: List<KnowledgeCatalogScope> = emptyList(),
     val selectedKnowledgeScope: KnowledgeCatalogScope? = null,
     val knowledgeChapters: List<KnowledgeTreeChapter> = emptyList(),

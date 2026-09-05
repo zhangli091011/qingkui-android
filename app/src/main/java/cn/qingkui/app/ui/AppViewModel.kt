@@ -232,8 +232,9 @@ class AppViewModel(
             val (credits, graph, learning, sessions, ledger, mistakes) = coroutineScope {
                 val creditTask = async { repository.credits() }
                 val graphTask = async {
-                    _uiState.value.selectedNodeId?.let { selectedNodeId ->
-                        runCatching { repository.graph(selectedNodeId) }.getOrNull()
+                    val state = _uiState.value
+                    (state.graphCenterNodeId ?: state.selectedNodeId)?.let { centerNodeId ->
+                        runCatching { repository.graph(centerNodeId) }.getOrNull()
                     } ?: repository.graph()
                 }
                 val learningTask = async { repository.learningItems(_uiState.value.learningFilter) }
@@ -247,7 +248,7 @@ class AppViewModel(
             val (catalog, selectedDetail) = coroutineScope {
                 val catalogTask = async { repository.knowledgeCatalog() }
                 val detailTask = async {
-                    graph.selectedNodeId?.let { nodeId -> runCatching { repository.nodeDetail(nodeId) }.getOrNull() }
+                    _uiState.value.selectedNodeId?.let { nodeId -> runCatching { repository.nodeDetail(nodeId) }.getOrNull() }
                 }
                 catalogTask.await() to detailTask.await()
             }
@@ -260,16 +261,19 @@ class AppViewModel(
             } ?: catalog.firstOrNull { it.subject == _uiState.value.currentSubject } ?: catalog.firstOrNull()
             val chapters = if (scope != null) repository.knowledgeTree(scope) else emptyList()
             _uiState.update {
+                val retainedCenterId = it.graphCenterNodeId ?: graph.selectedNodeId
+                val retainedSelectedId = it.selectedNodeId ?: graph.selectedNodeId
                 it.copy(
                     credits = credits,
                     graphNodes = graph.nodes.map { node ->
                         if (selectedDetail != null && node.id == selectedDetail.id) selectedDetail else node
                     },
                     graphRelations = graph.relations,
+                    graphCenterNodeId = retainedCenterId,
                     knowledgeCatalog = catalog,
                     selectedKnowledgeScope = scope,
                     knowledgeChapters = chapters,
-                    selectedNodeId = graph.selectedNodeId,
+                    selectedNodeId = retainedSelectedId,
                     selectedNodeDetail = selectedDetail,
                     noteDraft = selectedDetail?.note.orEmpty(),
                     currentSubject = scope?.subject
@@ -822,6 +826,14 @@ class AppViewModel(
     }
 
     fun selectNode(nodeId: String) {
+        val beforeSelect = _uiState.value
+        val graphCenterId = beforeSelect.graphCenterNodeId
+            ?: beforeSelect.graphNodes.firstOrNull()?.id
+            // During the first graph load the node list may still be empty,
+            // while the restored selection already identifies the original
+            // centre. Keep that anchor instead of falling back to the clicked
+            // node returned by the expansion request.
+            ?: beforeSelect.selectedNodeId
         _uiState.update {
             it.copy(
                 selectedNodeId = nodeId,
@@ -833,7 +845,44 @@ class AppViewModel(
         }
         viewModelScope.launch {
             runCatching { repository.graph(nodeId) }
-                .onSuccess { graph -> _uiState.update { it.copy(graphNodes = graph.nodes, graphRelations = graph.relations, selectedNodeId = nodeId) } }
+                .onSuccess { expansion ->
+                    _uiState.update { state ->
+                        val centerId = state.graphCenterNodeId
+                            ?: graphCenterId
+                            ?: state.graphNodes.firstOrNull()?.id
+                            ?: expansion.selectedNodeId
+                        val existingIds = state.graphNodes.asSequence().map { it.id }.toHashSet()
+                        val anchor = state.graphNodes.firstOrNull { it.id == nodeId }
+                            ?: expansion.nodes.firstOrNull { it.id == nodeId }
+                        val childIds = expansion.relations
+                            .asSequence()
+                            .filter { it.fromId == nodeId }
+                            .map { it.toId }
+                            .toHashSet()
+                        val appended = expansion.nodes
+                            .asSequence()
+                            .filter { it.id in childIds && it.id !in existingIds }
+                            .mapIndexed { index, node ->
+                                // Place newly discovered nodes around the clicked node,
+                                // keeping the original centre and all existing positions.
+                                val angle = (2.0 * Math.PI * index / maxOf(1, expansion.nodes.size - 1)) - Math.PI / 2
+                                val radius = .16 + (index / 8) * .07
+                                node.copy(
+                                    x = ((anchor?.x ?: .5f) + radius * kotlin.math.cos(angle)).toFloat().coerceIn(.08f, .92f),
+                                    y = ((anchor?.y ?: .5f) + radius * kotlin.math.sin(angle)).toFloat().coerceIn(.10f, .90f),
+                                )
+                            }
+                            .toList()
+                        val mergedRelations = (state.graphRelations + expansion.relations)
+                            .distinctBy { Triple(it.fromId, it.toId, it.type) }
+                        state.copy(
+                            graphNodes = (state.graphNodes + appended).distinctBy { it.id },
+                            graphRelations = mergedRelations,
+                            graphCenterNodeId = centerId,
+                            selectedNodeId = nodeId,
+                        )
+                    }
+                }
                 .onFailure { handleApiError(it as? Exception ?: Exception(it)) { state -> state } }
             runCatching { repository.nodeDetail(nodeId) }
                 .onSuccess { detail ->
@@ -990,7 +1039,7 @@ class AppViewModel(
         if (query.isBlank()) { refreshContent(); return }
         viewModelScope.launch {
             runCatching { repository.search(query.trim()) }
-                .onSuccess { graph -> _uiState.update { it.copy(graphNodes = graph.nodes, graphRelations = graph.relations, selectedNodeId = graph.selectedNodeId) } }
+                .onSuccess { graph -> _uiState.update { it.copy(graphNodes = graph.nodes, graphRelations = graph.relations, graphCenterNodeId = graph.selectedNodeId, selectedNodeId = graph.selectedNodeId) } }
                 .onFailure { handleApiError(it as? Exception ?: Exception(it)) { state -> state } }
         }
     }

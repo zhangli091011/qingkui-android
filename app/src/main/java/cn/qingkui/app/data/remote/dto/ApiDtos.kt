@@ -324,6 +324,7 @@ data class NeighborNodeDto(
     @SerializedName("is_favorite") val isFavorite: Boolean = false,
     @SerializedName("edge_type") val edgeType: String,
     @SerializedName("edge_explanation") val edgeExplanation: String,
+    @SerializedName("edge_outgoing") val edgeOutgoing: Boolean = true,
 )
 
 data class NeighborResponse(
