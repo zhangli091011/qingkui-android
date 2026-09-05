@@ -172,17 +172,57 @@ private fun EmptyChatHero(compact: Boolean, modifier: Modifier = Modifier) {
                 .height(if (compact) 300.dp else 260.dp),
             contentScale = ContentScale.FillBounds,
         )
-        Text(
-            text = "今天想弄懂什么？",
+        TypingPrompt(
             style = if (compact) {
                 MaterialTheme.typography.headlineSmall.copy(fontSize = 26.sp, lineHeight = 40.sp)
             } else {
                 MaterialTheme.typography.headlineMedium
             },
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center,
         )
     }
+}
+
+/**
+ * Empty-state prompt with a lightweight terminal-style typewriter treatment.
+ * The prompt types in, pauses for reading, then erases itself and repeats.
+ * A separate blinking caret makes the interaction feel alive without
+ * affecting the rest of the composer or conversation state.
+ */
+@Composable
+private fun TypingPrompt(
+    style: androidx.compose.ui.text.TextStyle,
+) {
+    val prompt = "今天想弄懂什么？"
+    var characterCount by remember { mutableStateOf(0) }
+    var cursorVisible by remember { mutableStateOf(true) }
+
+    LaunchedEffect(prompt) {
+        while (true) {
+            for (count in 1..prompt.length) {
+                characterCount = count
+                kotlinx.coroutines.delay(92)
+            }
+            kotlinx.coroutines.delay(1_300)
+            for (count in (prompt.length - 1) downTo 0) {
+                characterCount = count
+                kotlinx.coroutines.delay(62)
+            }
+            kotlinx.coroutines.delay(520)
+        }
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(480)
+            cursorVisible = !cursorVisible
+        }
+    }
+
+    Text(
+        text = prompt.take(characterCount) + if (cursorVisible) "▌" else " ",
+        style = style,
+        color = MaterialTheme.colorScheme.onBackground,
+        textAlign = TextAlign.Center,
+    )
 }
 
 @Composable
