@@ -1261,6 +1261,7 @@ class AppViewModel(
 private const val STATE_DESTINATION = "ui.destination"
 private const val STATE_DRAFT = "ui.chat_draft"
 private const val STATE_SELECTED_NODE = "ui.selected_node"
+private const val STATE_GRAPH_CENTER_NODE = "ui.graph_center_node"
 private const val STATE_HELP_LEVEL = "ui.help_level"
 private const val STATE_QA_MODE = "ui.qa_mode"
 private const val STATE_SUBJECT = "ui.subject"
@@ -1284,6 +1285,7 @@ private fun restoredUiState(handle: SavedStateHandle): AppUiState {
         destination = enumValueOrDefault(handle[STATE_DESTINATION], AppDestination.Chat),
         draft = handle.get<String>(STATE_DRAFT).orEmpty(),
         selectedNodeId = handle[STATE_SELECTED_NODE],
+        graphCenterNodeId = handle[STATE_GRAPH_CENTER_NODE],
         helpLevel = enumValueOrDefault(handle[STATE_HELP_LEVEL], QaHelpLevel.Approach),
         qaMode = enumValueOrDefault(handle[STATE_QA_MODE], QaMode.Knowledge),
         currentSubject = subject,
@@ -1302,6 +1304,7 @@ private fun persistUiState(handle: SavedStateHandle, state: AppUiState) {
     handle[STATE_DESTINATION] = state.destination.name
     handle[STATE_DRAFT] = state.draft
     handle[STATE_SELECTED_NODE] = state.selectedNodeId
+    handle[STATE_GRAPH_CENTER_NODE] = state.graphCenterNodeId
     handle[STATE_HELP_LEVEL] = state.helpLevel.name
     handle[STATE_QA_MODE] = state.qaMode.name
     handle[STATE_SUBJECT] = state.currentSubject
