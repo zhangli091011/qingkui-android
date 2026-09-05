@@ -192,22 +192,39 @@ private fun EmptyChatHero(compact: Boolean, modifier: Modifier = Modifier) {
 private fun TypingPrompt(
     style: androidx.compose.ui.text.TextStyle,
 ) {
-    val prompt = "今天想弄懂什么？"
+    val prompts = remember {
+        listOf(
+            "今天想弄懂什么？",
+            "哪道题卡住了？",
+            "把难点交给青葵吧。",
+            "从一个知识点开始吧。",
+        )
+    }
+    var promptIndex by remember { mutableStateOf(0) }
+    var prompt by remember { mutableStateOf(prompts.first()) }
     var characterCount by remember { mutableStateOf(0) }
     var cursorVisible by remember { mutableStateOf(true) }
 
-    LaunchedEffect(prompt) {
+    LaunchedEffect(prompts) {
         while (true) {
+            // Leave a small breathing space before each new sentence so the
+            // transition does not feel like one continuous stream of text.
+            kotlinx.coroutines.delay(720)
+            prompt = prompts[promptIndex]
+            characterCount = 0
             for (count in 1..prompt.length) {
                 characterCount = count
-                kotlinx.coroutines.delay(92)
+                kotlinx.coroutines.delay(105)
             }
-            kotlinx.coroutines.delay(1_300)
+            // Give the complete sentence enough time to be read.
+            kotlinx.coroutines.delay(1_650)
             for (count in (prompt.length - 1) downTo 0) {
                 characterCount = count
-                kotlinx.coroutines.delay(62)
+                kotlinx.coroutines.delay(72)
             }
-            kotlinx.coroutines.delay(520)
+            // Pause on the empty state before moving to a different prompt.
+            kotlinx.coroutines.delay(900)
+            promptIndex = (promptIndex + 1) % prompts.size
         }
     }
     LaunchedEffect(Unit) {
