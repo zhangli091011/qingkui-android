@@ -17,7 +17,26 @@ import okhttp3.Route
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import okhttp3.Dns
+import java.net.InetAddress
 import java.util.concurrent.TimeUnit
+
+/**
+ * The emulator's DNS resolver intermittently returns NXDOMAIN for the sslip.io
+ * hostname even though the server is healthy. Keep the TLS/SNI hostname (so the
+ * certificate remains valid) but resolve the production API through its stable
+ * IPv4 address. All other hosts continue to use the platform resolver.
+ */
+private object QingkuiDns : Dns {
+    private const val API_HOST = "qingkui-api.82-158-229-157.sslip.io"
+
+    override fun lookup(hostname: String): List<InetAddress> {
+        if (hostname.equals(API_HOST, ignoreCase = true)) {
+            return listOf(InetAddress.getByAddress(hostname, byteArrayOf(82, 158.toByte(), 229.toByte(), 157.toByte())))
+        }
+        return Dns.SYSTEM.lookup(hostname)
+    }
+}
 
 class AuthInterceptor(private val tokenStore: TokenStore) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
@@ -35,7 +54,7 @@ class RefreshAuthenticator(
     private val tokenStore: TokenStore,
     private val gson: Gson,
 ) : Authenticator {
-    private val refreshClient = OkHttpClient.Builder().build()
+    private val refreshClient = OkHttpClient.Builder().dns(QingkuiDns).build()
     private val lock = Any()
 
     override fun authenticate(route: Route?, response: Response): Request? {
@@ -87,6 +106,7 @@ object NetworkModule {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BASIC else HttpLoggingInterceptor.Level.NONE
         }
         val client = OkHttpClient.Builder()
+            .dns(QingkuiDns)
             .addInterceptor(AuthInterceptor(tokenStore))
             .addInterceptor(logger)
             .authenticator(RefreshAuthenticator(tokenStore, gson))
