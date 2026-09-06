@@ -33,8 +33,8 @@ val releaseApiBaseUrl = when (qingkuiEnvironment) {
 }
 val qingkuiVersionCodeProperty = providers.gradleProperty("QINGKUI_VERSION_CODE").orNull
 val qingkuiVersionNameProperty = providers.gradleProperty("QINGKUI_VERSION_NAME").orNull
-val qingkuiVersionCode = qingkuiVersionCodeProperty?.toIntOrNull() ?: 2
-val qingkuiVersionName = qingkuiVersionNameProperty ?: "0.1.1"
+val qingkuiVersionCode = qingkuiVersionCodeProperty?.toIntOrNull() ?: 3
+val qingkuiVersionName = qingkuiVersionNameProperty ?: "0.1.2"
 val signingStorePath = providers.environmentVariable("QINGKUI_SIGNING_STORE_FILE").orNull
 val signingStorePassword = providers.environmentVariable("QINGKUI_SIGNING_STORE_PASSWORD").orNull
 val signingKeyAlias = providers.environmentVariable("QINGKUI_SIGNING_KEY_ALIAS").orNull
