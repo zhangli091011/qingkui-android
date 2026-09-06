@@ -161,7 +161,10 @@ interface QingkuiApi {
     ): cn.qingkui.app.data.remote.dto.KnowledgeTreeDto
 
     @GET("knowledge/nodes/{id}/neighbors")
-    suspend fun neighbors(@Path("id") nodeId: String): NeighborResponse
+    suspend fun neighbors(
+        @Path("id") nodeId: String,
+        @Query("direction") direction: String = "all",
+    ): NeighborResponse
 
     @GET("knowledge/nodes/{id}")
     suspend fun nodeDetail(@Path("id") nodeId: String): KnowledgeNodeDetailDto

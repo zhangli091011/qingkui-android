@@ -826,14 +826,6 @@ class AppViewModel(
     }
 
     fun selectNode(nodeId: String) {
-        val beforeSelect = _uiState.value
-        val graphCenterId = beforeSelect.graphCenterNodeId
-            ?: beforeSelect.graphNodes.firstOrNull()?.id
-            // During the first graph load the node list may still be empty,
-            // while the restored selection already identifies the original
-            // centre. Keep that anchor instead of falling back to the clicked
-            // node returned by the expansion request.
-            ?: beforeSelect.selectedNodeId
         _uiState.update {
             it.copy(
                 selectedNodeId = nodeId,
@@ -846,39 +838,15 @@ class AppViewModel(
         viewModelScope.launch {
             runCatching { repository.graph(nodeId) }
                 .onSuccess { expansion ->
-                    _uiState.update { state ->
-                        val centerId = state.graphCenterNodeId
-                            ?: graphCenterId
-                            ?: state.graphNodes.firstOrNull()?.id
-                            ?: expansion.selectedNodeId
-                        val existingIds = state.graphNodes.asSequence().map { it.id }.toHashSet()
-                        val anchor = state.graphNodes.firstOrNull { it.id == nodeId }
-                            ?: expansion.nodes.firstOrNull { it.id == nodeId }
-                        val childIds = expansion.relations
-                            .asSequence()
-                            .filter { it.fromId == nodeId }
-                            .map { it.toId }
-                            .toHashSet()
-                        val appended = expansion.nodes
-                            .asSequence()
-                            .filter { it.id in childIds && it.id !in existingIds }
-                            .mapIndexed { index, node ->
-                                // Place newly discovered nodes around the clicked node,
-                                // keeping the original centre and all existing positions.
-                                val angle = (2.0 * Math.PI * index / maxOf(1, expansion.nodes.size - 1)) - Math.PI / 2
-                                val radius = .16 + (index / 8) * .07
-                                node.copy(
-                                    x = ((anchor?.x ?: .5f) + radius * kotlin.math.cos(angle)).toFloat().coerceIn(.08f, .92f),
-                                    y = ((anchor?.y ?: .5f) + radius * kotlin.math.sin(angle)).toFloat().coerceIn(.10f, .90f),
-                                )
-                            }
-                            .toList()
-                        val mergedRelations = (state.graphRelations + expansion.relations)
-                            .distinctBy { Triple(it.fromId, it.toId, it.type) }
-                        state.copy(
-                            graphNodes = (state.graphNodes + appended).distinctBy { it.id },
-                            graphRelations = mergedRelations,
-                            graphCenterNodeId = centerId,
+                    // Replace the visible level with the clicked node as the
+                    // new centre and only its outgoing child branch. This
+                    // gives a predictable one-level drill-down and naturally
+                    // reduces the visible node count on every click.
+                    _uiState.update {
+                        it.copy(
+                            graphNodes = expansion.nodes,
+                            graphRelations = expansion.relations,
+                            graphCenterNodeId = expansion.selectedNodeId,
                             selectedNodeId = nodeId,
                         )
                     }

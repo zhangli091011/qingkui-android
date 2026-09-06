@@ -459,7 +459,10 @@ class NetworkAppRepository(
     }
 
     override suspend fun graph(centerId: String): GraphData = apiCall {
-        val response = api.neighbors(centerId)
+        // Graph navigation is a drill-down: only true outgoing children are
+        // displayed around the new centre. The all-neighbours API remains
+        // available for other callers that need backlinks.
+        val response = api.neighbors(centerId, direction = "outgoing")
         val center = response.center.toUi(.5f, .5f)
         val neighbors = response.nodes.mapIndexed { index, node ->
             val (ring, positionInRing) = graphRingPosition(index)
