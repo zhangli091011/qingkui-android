@@ -478,7 +478,12 @@ class NetworkAppRepository(
         // Graph navigation is a drill-down: only true outgoing children are
         // displayed around the new centre. The all-neighbours API remains
         // available for other callers that need backlinks.
-        val response = api.neighbors(centerId, direction = "outgoing")
+        // Child edges are the primary expansion. Some legacy/imported graphs
+        // have their taxonomy edge reversed, so fall back to all neighbours
+        // when no outgoing branch exists instead of rendering a lone centre.
+        val response = api.neighbors(centerId, direction = "outgoing").let { outgoing ->
+            if (outgoing.nodes.isNotEmpty()) outgoing else api.neighbors(centerId, direction = "all")
+        }
         val center = response.center.toUi(.5f, .5f)
         val neighbors = response.nodes.mapIndexed { index, node ->
             val (ring, positionInRing) = graphRingPosition(index)

@@ -263,12 +263,19 @@ class AppViewModel(
             _uiState.update {
                 val retainedCenterId = it.graphCenterNodeId ?: graph.selectedNodeId
                 val retainedSelectedId = it.selectedNodeId ?: graph.selectedNodeId
+                val mergedNodes = it.graphNodes.associateBy { node -> node.id }.toMutableMap()
+                graph.nodes.forEach { node ->
+                    val previous = mergedNodes[node.id]
+                    mergedNodes[node.id] = if (previous == null) node else node.copy(x = previous.x, y = previous.y)
+                }
+                val mergedRelations = (it.graphRelations + graph.relations)
+                    .distinctBy { relation -> Triple(relation.fromId, relation.toId, relation.type) }
                 it.copy(
                     credits = credits,
-                    graphNodes = graph.nodes.map { node ->
-                        if (selectedDetail != null && node.id == selectedDetail.id) selectedDetail else node
+                    graphNodes = mergedNodes.values.map { node ->
+                        if (selectedDetail != null && node.id == selectedDetail.id) selectedDetail.copy(x = node.x, y = node.y) else node
                     },
-                    graphRelations = graph.relations,
+                    graphRelations = mergedRelations,
                     graphCenterNodeId = retainedCenterId,
                     knowledgeCatalog = catalog,
                     selectedKnowledgeScope = scope,
@@ -890,7 +897,12 @@ class AppViewModel(
                         it.copy(
                             selectedNodeDetail = detail,
                             noteDraft = detail.note,
-                            graphNodes = it.graphNodes.map { node -> if (node.id == nodeId) detail else node },
+                            // Details are fetched with a neutral (.5,.5) position;
+                            // keep the node's graph position so selecting it never
+                            // makes it jump to/replace the visual centre.
+                            graphNodes = it.graphNodes.map { node ->
+                                if (node.id == nodeId) detail.copy(x = node.x, y = node.y) else node
+                            },
                         )
                     }
                 }
@@ -1036,7 +1048,9 @@ class AppViewModel(
     }
 
     fun searchGraph(query: String) {
-        if (query.isBlank()) { refreshContent(); return }
+        // An empty search is the normal graph state. Do not refresh here:
+        // refreshing used to replace all revealed branches with one API page.
+        if (query.isBlank()) return
         viewModelScope.launch {
             runCatching { repository.search(query.trim()) }
                 .onSuccess { graph -> _uiState.update { it.copy(graphNodes = graph.nodes, graphRelations = graph.relations, graphCenterNodeId = graph.selectedNodeId, selectedNodeId = graph.selectedNodeId) } }
