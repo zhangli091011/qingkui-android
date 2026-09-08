@@ -384,6 +384,34 @@ data class KnowledgeNodeDetailDto(
     @SerializedName("is_favorite") val isFavorite: Boolean = false,
 )
 
+data class AdminUserDto(
+    val id: String,
+    val username: String,
+    val email: String? = null,
+    val nickname: String = "",
+    val role: String = "student",
+    @SerializedName("tenant_id") val tenantId: String? = null,
+    @SerializedName("is_active") val isActive: Boolean = true,
+    val balance: Int? = null,
+    @SerializedName("created_at") val createdAt: String = "",
+    @SerializedName("deleted_at") val deletedAt: String? = null,
+)
+
+data class AdminSessionDto(
+    val id: String,
+    @SerializedName("user_id") val userId: String,
+    val username: String = "",
+    @SerializedName("device_name") val deviceName: String? = null,
+    @SerializedName("expires_at") val expiresAt: String = "",
+    @SerializedName("revoked_at") val revokedAt: String? = null,
+    @SerializedName("created_at") val createdAt: String = "",
+    val active: Boolean = true,
+)
+
+data class CorpusGenerateRequest(val subject: String, val category: String = "综合", val topic: String? = null, val grade: String = "高中", val count: Int = 3)
+data class CorpusItemDto(val title: String, val content: String, val keywords: List<String> = emptyList(), val subject: String = "", val category: String = "", val grade: String = "", @SerializedName("source_date") val sourceDate: String = "", @SerializedName("source_url") val sourceUrl: String = "")
+data class CorpusGenerateResponseDto(val items: List<CorpusItemDto> = emptyList())
+
 data class KnowledgeStateUpdate(
     val status: String,
     val note: String? = null,

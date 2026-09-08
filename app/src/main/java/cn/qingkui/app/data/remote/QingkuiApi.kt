@@ -72,6 +72,19 @@ interface QingkuiApi {
     @GET("workspace/activity")
     suspend fun workspaceActivity(@Query("limit") limit: Int = 50): cn.qingkui.app.data.remote.dto.WorkspaceActivityResponseDto
 
+    @GET("admin/users")
+    suspend fun adminUsers(@Query("limit") limit: Int = 100): List<cn.qingkui.app.data.remote.dto.AdminUserDto>
+    @PATCH("admin/users/{id}/status")
+    suspend fun adminUserStatus(@Path("id") id: String, @Body body: Map<String, Boolean>): cn.qingkui.app.data.remote.dto.AdminUserDto
+    @PATCH("admin/users/{id}/role")
+    suspend fun adminUserRole(@Path("id") id: String, @Body body: Map<String, String>): cn.qingkui.app.data.remote.dto.AdminUserDto
+    @GET("admin/sessions")
+    suspend fun adminSessions(@Query("active_only") activeOnly: Boolean = false, @Query("limit") limit: Int = 200): List<cn.qingkui.app.data.remote.dto.AdminSessionDto>
+    @DELETE("admin/sessions/{id}")
+    suspend fun revokeAdminSession(@Path("id") id: String): cn.qingkui.app.data.remote.dto.AdminSessionDto
+    @POST("corpus/generate")
+    suspend fun generateCorpus(@Body body: cn.qingkui.app.data.remote.dto.CorpusGenerateRequest): cn.qingkui.app.data.remote.dto.CorpusGenerateResponseDto
+
     @POST("auth/register")
     suspend fun register(@Body body: RegisterRequest): AuthResponse
 

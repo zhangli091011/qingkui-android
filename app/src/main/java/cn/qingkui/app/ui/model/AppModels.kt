@@ -8,6 +8,7 @@ enum class AppDestination(val label: String) {
     Content("内容"),
     Operations("运行"),
     AdminConsole("管理控制台"),
+    Corpus("语料"),
     Mistakes("错题"),
     Chat("问答"),
     Graph("图谱"),
@@ -73,6 +74,10 @@ data class WorkspaceTask(
     val createdAt: String,
     val errorCode: String? = null,
 )
+
+@Immutable data class AdminUserItem(val id: String, val username: String, val nickname: String, val role: String, val isActive: Boolean, val balance: Int = 0)
+@Immutable data class AdminSessionItem(val id: String, val username: String, val deviceName: String, val expiresAt: String, val active: Boolean)
+@Immutable data class CorpusItem(val title: String, val content: String, val keywords: List<String>, val subject: String, val category: String, val grade: String, val sourceDate: String, val sourceUrl: String)
 
 enum class MessageAuthor { Student, Assistant }
 
@@ -507,4 +512,10 @@ data class AppUiState(
     val workspaceTasks: List<WorkspaceTask> = emptyList(),
     val workspaceAlerts: List<WorkspaceAlert> = emptyList(),
     val adminAccessToken: String? = null,
+    val adminUsers: List<AdminUserItem> = emptyList(),
+    val adminSessions: List<AdminSessionItem> = emptyList(),
+    val adminSection: String = "总览",
+    val adminLoading: Boolean = false,
+    val corpusItems: List<CorpusItem> = emptyList(),
+    val corpusLoading: Boolean = false,
 )

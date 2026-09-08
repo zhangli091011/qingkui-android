@@ -80,6 +80,9 @@ import cn.qingkui.app.ui.model.WorkspaceCapabilities
 import cn.qingkui.app.ui.model.WorkspaceDashboard
 import cn.qingkui.app.ui.model.WorkspaceMetricSnapshot
 import cn.qingkui.app.ui.model.WorkspaceTask
+import cn.qingkui.app.ui.model.AdminUserItem
+import cn.qingkui.app.ui.model.AdminSessionItem
+import cn.qingkui.app.ui.model.CorpusItem
 import com.google.gson.Gson
 import com.google.gson.JsonParser
 import kotlinx.coroutines.delay
@@ -125,6 +128,12 @@ interface AppRepository {
     suspend fun workspaceDashboard(): WorkspaceDashboard = WorkspaceDashboard()
     suspend fun workspaceTasks(): List<WorkspaceTask> = emptyList()
     suspend fun workspaceAlerts(): List<WorkspaceAlert> = emptyList()
+    suspend fun adminUsers(): List<AdminUserItem> = emptyList()
+    suspend fun adminSessions(): List<AdminSessionItem> = emptyList()
+    suspend fun updateAdminUserStatus(id: String, active: Boolean): AdminUserItem? = null
+    suspend fun updateAdminUserRole(id: String, role: String): AdminUserItem? = null
+    suspend fun revokeAdminSession(id: String): AdminSessionItem? = null
+    suspend fun generateCorpus(subject: String, category: String, topic: String?, grade: String, count: Int): List<CorpusItem> = emptyList()
     suspend fun hasSession(): Boolean
     suspend fun nickname(): String?
     suspend fun login(username: String, password: String): String
@@ -281,6 +290,13 @@ class NetworkAppRepository(
         val value = api.workspaceAlerts()
         (value.alerts + value.releaseBlockers).map { WorkspaceAlert(it.severity, it.code, it.message, it.value) }
     }
+
+    override suspend fun adminUsers(): List<AdminUserItem> = apiCall { api.adminUsers().map { it.toAdminUser() } }
+    override suspend fun adminSessions(): List<AdminSessionItem> = apiCall { api.adminSessions(false).map { it.toAdminSession() } }
+    override suspend fun updateAdminUserStatus(id: String, active: Boolean): AdminUserItem = apiCall { api.adminUserStatus(id, mapOf("is_active" to active)).toAdminUser() }
+    override suspend fun updateAdminUserRole(id: String, role: String): AdminUserItem = apiCall { api.adminUserRole(id, mapOf("role" to role)).toAdminUser() }
+    override suspend fun revokeAdminSession(id: String): AdminSessionItem = apiCall { api.revokeAdminSession(id).toAdminSession() }
+    override suspend fun generateCorpus(subject: String, category: String, topic: String?, grade: String, count: Int): List<CorpusItem> = apiCall { api.generateCorpus(cn.qingkui.app.data.remote.dto.CorpusGenerateRequest(subject, category, topic, grade, count)).items.map { CorpusItem(it.title, it.content, it.keywords, it.subject, it.category, it.grade, it.sourceDate, it.sourceUrl) } }
 
     override suspend fun hasSession(): Boolean = tokenStore.refreshToken() != null
     override suspend fun nickname(): String? = tokenStore.nickname()
@@ -970,6 +986,9 @@ class NetworkAppRepository(
         evidence = "$subject · $grade · $chapter",
         saved = isFavorite,
     )
+
+    private fun cn.qingkui.app.data.remote.dto.AdminUserDto.toAdminUser() = AdminUserItem(id, username, nickname.ifBlank { username }, role, isActive, balance ?: 0)
+    private fun cn.qingkui.app.data.remote.dto.AdminSessionDto.toAdminSession() = AdminSessionItem(id, username, deviceName ?: "未命名设备", expiresAt.replace('T', ' ').take(16), active)
 
     private fun KnowledgeNodeDetailDto.toUiNode(x: Float, y: Float) = KnowledgeNode(
         id = id,

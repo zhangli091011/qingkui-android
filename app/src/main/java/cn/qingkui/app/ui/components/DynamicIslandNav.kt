@@ -39,6 +39,7 @@ fun DynamicIslandNav(
     val destinations = buildList {
         addAll(listOf(AppDestination.Chat, AppDestination.Graph, AppDestination.Learning))
         add(AppDestination.Mistakes)
+        add(AppDestination.Corpus)
         if (!compact) add(AppDestination.Account)
     }
     val height = if (compact) 56.dp else 64.dp

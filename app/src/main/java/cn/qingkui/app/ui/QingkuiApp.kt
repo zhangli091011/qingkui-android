@@ -47,6 +47,7 @@ import cn.qingkui.app.ui.screens.LearningScreen
 import cn.qingkui.app.ui.screens.MistakeCaptureScreen
 import cn.qingkui.app.ui.screens.WorkspaceScreen
 import cn.qingkui.app.ui.screens.AdminConsoleScreen
+import cn.qingkui.app.ui.screens.CorpusScreen
 
 @Composable
 fun QingkuiApp() {
@@ -181,8 +182,20 @@ fun QingkuiApp() {
                         onOpenAdminConsole = viewModel::openAdminConsole,
                     )
                     AppDestination.AdminConsole -> AdminConsoleScreen(
-                        accessToken = uiState.adminAccessToken,
+                        users = uiState.adminUsers,
+                        sessions = uiState.adminSessions,
+                        section = uiState.adminSection,
+                        loading = uiState.adminLoading,
+                        onSection = viewModel::setAdminSection,
+                        onRefresh = viewModel::refreshAdmin,
+                        onToggleUser = viewModel::toggleAdminUser,
+                        onRevokeSession = viewModel::revokeAdminSession,
                         onClose = { viewModel.selectDestination(AppDestination.Account) },
+                    )
+                    AppDestination.Corpus -> CorpusScreen(
+                        items = uiState.corpusItems,
+                        loading = uiState.corpusLoading,
+                        onGenerate = viewModel::generateCorpus,
                     )
                     AppDestination.Mistakes -> LearningScreen(
                         compact = compact,

@@ -426,8 +426,26 @@ class AppViewModel(
 
     fun openAdminConsole() {
         viewModelScope.launch {
-            val token = repository.accessToken()
-            _uiState.update { it.copy(adminAccessToken = token, destination = AppDestination.AdminConsole, drawerOpen = false) }
+            _uiState.update { it.copy(destination = AppDestination.AdminConsole, drawerOpen = false, adminLoading = true) }
+            runCatching {
+                val users = repository.adminUsers()
+                val sessions = repository.adminSessions()
+                _uiState.update { it.copy(adminUsers = users, adminSessions = sessions, adminLoading = false) }
+            }.onFailure { handleApiError(it as? Exception ?: Exception(it)) { state -> state.copy(adminLoading = false) } }
+        }
+    }
+
+    fun refreshAdmin() { openAdminConsole() }
+    fun setAdminSection(section: String) { _uiState.update { it.copy(adminSection = section) } }
+    fun toggleAdminUser(id: String, active: Boolean) { viewModelScope.launch { runCatching { repository.updateAdminUserStatus(id, active); _uiState.update { s -> s.copy(adminUsers = repository.adminUsers()) } }.onFailure { handleApiError(it as? Exception ?: Exception(it)) { s -> s } } } }
+    fun changeAdminRole(id: String, role: String) { viewModelScope.launch { runCatching { repository.updateAdminUserRole(id, role); _uiState.update { s -> s.copy(adminUsers = repository.adminUsers()) } }.onFailure { handleApiError(it as? Exception ?: Exception(it)) { s -> s } } } }
+    fun revokeAdminSession(id: String) { viewModelScope.launch { runCatching { repository.revokeAdminSession(id); _uiState.update { s -> s.copy(adminSessions = repository.adminSessions()) } }.onFailure { handleApiError(it as? Exception ?: Exception(it)) { s -> s } } } }
+    fun generateCorpus(subject: String, category: String, topic: String?, grade: String = "高中", count: Int = 3) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(corpusLoading = true) }
+            runCatching { repository.generateCorpus(subject, category, topic, grade, count) }
+                .onSuccess { items -> _uiState.update { it.copy(corpusItems = items, corpusLoading = false) } }
+                .onFailure { handleApiError(it as? Exception ?: Exception(it)) { state -> state.copy(corpusLoading = false) } }
         }
     }
 
@@ -838,15 +856,29 @@ class AppViewModel(
         viewModelScope.launch {
             runCatching { repository.graph(nodeId) }
                 .onSuccess { expansion ->
-                    // Replace the visible level with the clicked node as the
-                    // new centre and only its outgoing child branch. This
-                    // gives a predictable one-level drill-down and naturally
-                    // reduces the visible node count on every click.
                     _uiState.update {
+                        val existingNodes = it.graphNodes.associateBy { node -> node.id }.toMutableMap()
+                        // Keep the current centre and every already revealed
+                        // branch. The API response contains the clicked node
+                        // plus its outgoing children; only new nodes are added.
+                        val anchor = it.graphNodes.firstOrNull { node -> node.id == nodeId }
+                        val fresh = expansion.nodes.filterNot { node -> existingNodes.containsKey(node.id) }
+                        val anchorX = anchor?.x ?: 0.5f
+                        val anchorY = anchor?.y ?: 0.5f
+                        fresh.forEachIndexed { index, node ->
+                            val angle = (-Math.PI / 2.0) + (2.0 * Math.PI * index / fresh.size.coerceAtLeast(1))
+                            val radius = 0.16f + (index / 6) * 0.045f
+                            existingNodes[node.id] = node.copy(
+                                x = (anchorX + radius * kotlin.math.cos(angle)).coerceIn(0.08, 0.92).toFloat(),
+                                y = (anchorY + radius * kotlin.math.sin(angle)).coerceIn(0.12, 0.88).toFloat(),
+                            )
+                        }
+                        val mergedRelations = (it.graphRelations + expansion.relations)
+                            .distinctBy { relation -> Triple(relation.fromId, relation.toId, relation.type) }
                         it.copy(
-                            graphNodes = expansion.nodes,
-                            graphRelations = expansion.relations,
-                            graphCenterNodeId = expansion.selectedNodeId,
+                            graphNodes = existingNodes.values.toList(),
+                            graphRelations = mergedRelations,
+                            graphCenterNodeId = it.graphCenterNodeId ?: expansion.selectedNodeId,
                             selectedNodeId = nodeId,
                         )
                     }
