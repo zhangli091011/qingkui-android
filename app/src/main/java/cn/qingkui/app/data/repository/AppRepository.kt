@@ -91,6 +91,9 @@ import cn.qingkui.app.ui.model.AdminAuditItem
 import cn.qingkui.app.ui.model.AdminAlertItem
 import cn.qingkui.app.ui.model.AdminCheckItem
 import cn.qingkui.app.ui.model.AdminFeedbackItem
+import cn.qingkui.app.ui.model.AdminConversationUserItem
+import cn.qingkui.app.ui.model.AdminConversationItem
+import cn.qingkui.app.ui.model.AdminConversationMessageItem
 import cn.qingkui.app.ui.model.CorpusItem
 import com.google.gson.Gson
 import com.google.gson.JsonParser
@@ -141,6 +144,8 @@ interface AppRepository {
     suspend fun adminSessions(): List<AdminSessionItem> = emptyList()
     suspend fun updateAdminUserStatus(id: String, active: Boolean): AdminUserItem? = null
     suspend fun updateAdminUserRole(id: String, role: String): AdminUserItem? = null
+    suspend fun updateAdminUser(id: String, request: cn.qingkui.app.data.remote.dto.AdminUserUpdateRequest): AdminUserItem? = null
+    suspend fun adjustAdminUserCredits(id: String, amount: Int, reason: String): Int? = null
     suspend fun revokeAdminSession(id: String): AdminSessionItem? = null
     suspend fun adminKnowledgeNodes(): List<AdminNodeItem> = emptyList()
     suspend fun updateAdminKnowledgeNode(id: String, request: cn.qingkui.app.data.remote.dto.AdminNodeUpdateRequest): AdminNodeItem? = null
@@ -159,6 +164,9 @@ interface AppRepository {
     suspend fun adminGovernance(): Map<String, Int> = emptyMap()
     suspend fun adminAlerts(): List<AdminAlertItem> = emptyList()
     suspend fun adminFeedback(): List<AdminFeedbackItem> = emptyList()
+    suspend fun adminConversationUsers(): List<AdminConversationUserItem> = emptyList()
+    suspend fun adminConversations(userId: String): List<AdminConversationItem> = emptyList()
+    suspend fun deleteAdminConversation(id: String) {}
     suspend fun generateCorpus(subject: String, category: String, topic: String?, grade: String, count: Int): List<CorpusItem> = emptyList()
     suspend fun hasSession(): Boolean
     suspend fun nickname(): String?
@@ -321,6 +329,8 @@ class NetworkAppRepository(
     override suspend fun adminSessions(): List<AdminSessionItem> = apiCall { api.adminSessions(false).map { it.toAdminSession() } }
     override suspend fun updateAdminUserStatus(id: String, active: Boolean): AdminUserItem = apiCall { api.adminUserStatus(id, mapOf("is_active" to active)).toAdminUser() }
     override suspend fun updateAdminUserRole(id: String, role: String): AdminUserItem = apiCall { api.adminUserRole(id, mapOf("role" to role)).toAdminUser() }
+    override suspend fun updateAdminUser(id: String, request: cn.qingkui.app.data.remote.dto.AdminUserUpdateRequest): AdminUserItem = apiCall { api.adminUserUpdate(id, request).toAdminUser() }
+    override suspend fun adjustAdminUserCredits(id: String, amount: Int, reason: String): Int = apiCall { api.adminCreditAdjust(id, cn.qingkui.app.data.remote.dto.AdminCreditAdjustmentRequest(amount, reason)).balance }
     override suspend fun revokeAdminSession(id: String): AdminSessionItem = apiCall { api.revokeAdminSession(id).toAdminSession() }
     override suspend fun adminKnowledgeNodes(): List<AdminNodeItem> = apiCall { api.adminKnowledgeNodes().map { AdminNodeItem(it.id,it.name,it.subject,it.grade,it.chapter,it.definition,it.explanation,it.reviewStatus,it.reviewStatus == "approved",it.version,it.sourceExcerpt) } }
     override suspend fun updateAdminKnowledgeNode(id: String, request: cn.qingkui.app.data.remote.dto.AdminNodeUpdateRequest): AdminNodeItem = apiCall { api.updateAdminKnowledgeNode(id,request).let { AdminNodeItem(it.id,it.name,it.subject,it.grade,it.chapter,it.definition,it.explanation,it.reviewStatus,it.reviewStatus == "approved",it.version,it.sourceExcerpt) } }
@@ -339,6 +349,9 @@ class NetworkAppRepository(
     override suspend fun adminGovernance(): Map<String, Int> = apiCall { val r=api.adminGovernanceReport(); (r.nodes+r.documents+r.relations+r.blockerCounts).mapValues { it.value } }
     override suspend fun adminAlerts(): List<AdminAlertItem> = apiCall { api.adminOperationalAlerts().alerts.map { AdminAlertItem(it.severity,it.code,it.message,it.value,it.threshold) } }
     override suspend fun adminFeedback(): List<AdminFeedbackItem> = apiCall { api.adminFeedback().map { AdminFeedbackItem(it.id,it.category,it.content,it.status,it.createdAt) } }
+    override suspend fun adminConversationUsers(): List<AdminConversationUserItem> = apiCall { api.adminConversationUsers().map { AdminConversationUserItem(it.userId,it.username,it.nickname,it.conversationCount,it.messageCount,it.latestActivityAt) } }
+    override suspend fun adminConversations(userId: String): List<AdminConversationItem> = apiCall { api.adminConversations(userId).map { conversation -> AdminConversationItem(conversation.id,conversation.userId,conversation.username,conversation.title,conversation.mode,conversation.subject,conversation.updatedAt,conversation.messages.map { m -> AdminConversationMessageItem(m.id,m.role,m.content,m.createdAt) }) } }
+    override suspend fun deleteAdminConversation(id: String) { apiCall { api.deleteAdminConversation(id); Unit } }
     override suspend fun generateCorpus(subject: String, category: String, topic: String?, grade: String, count: Int): List<CorpusItem> = apiCall { api.generateCorpus(cn.qingkui.app.data.remote.dto.CorpusGenerateRequest(subject, category, topic, grade, count)).items.map { CorpusItem(it.title, it.content, it.keywords, it.subject, it.category, it.grade, it.sourceDate, it.sourceUrl) } }
 
     override suspend fun hasSession(): Boolean = tokenStore.refreshToken() != null
@@ -1035,7 +1048,7 @@ class NetworkAppRepository(
         saved = isFavorite,
     )
 
-    private fun cn.qingkui.app.data.remote.dto.AdminUserDto.toAdminUser() = AdminUserItem(id, username, nickname.ifBlank { username }, role, isActive, balance ?: 0)
+    private fun cn.qingkui.app.data.remote.dto.AdminUserDto.toAdminUser() = AdminUserItem(id, username, nickname.ifBlank { username }, role, isActive, balance ?: 0, email, tenantId)
     private fun cn.qingkui.app.data.remote.dto.AdminSessionDto.toAdminSession() = AdminSessionItem(id, username, deviceName ?: "未命名设备", expiresAt.replace('T', ' ').take(16), active)
 
     private fun KnowledgeNodeDetailDto.toUiNode(x: Float, y: Float) = KnowledgeNode(

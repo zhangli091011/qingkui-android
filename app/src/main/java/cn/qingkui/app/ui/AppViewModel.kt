@@ -447,13 +447,18 @@ class AppViewModel(
                 val checks = runCatching { repository.adminReleaseChecks() }.getOrDefault(false to emptyList())
                 runCatching { repository.adminGovernance() }
                 val feedback = runCatching { repository.adminFeedback() }.getOrDefault(emptyList())
-                _uiState.update { it.copy(adminUsers = users, adminSessions = sessions, adminNodes = nodes, adminEdges = edges, adminDocuments = docs, adminFormulas = formulas, adminOcrTasks = ocr, adminAuditLogs = logs, adminAlerts = alerts, adminChecks = checks.second, adminFeedback = feedback, adminLoading = false, adminError = null) }
+                val conversationUsers = runCatching { repository.adminConversationUsers() }.getOrDefault(emptyList())
+                _uiState.update { it.copy(adminUsers = users, adminSessions = sessions, adminNodes = nodes, adminEdges = edges, adminDocuments = docs, adminFormulas = formulas, adminOcrTasks = ocr, adminAuditLogs = logs, adminAlerts = alerts, adminChecks = checks.second, adminFeedback = feedback, adminConversationUsers = conversationUsers, adminConversations = emptyList(), adminConversationUserId = null, adminLoading = false, adminError = null) }
             }.onFailure { error -> _uiState.update { it.copy(adminLoading = false, adminError = error.message ?: "管理数据加载失败") } }
         }
     }
 
     fun refreshAdmin() { openAdminConsole() }
     fun setAdminSection(section: String) { _uiState.update { it.copy(adminSection = section) } }
+    fun updateAdminUser(id: String, username: String, nickname: String, email: String, tenantId: String) { viewModelScope.launch { runCatching { repository.updateAdminUser(id, cn.qingkui.app.data.remote.dto.AdminUserUpdateRequest(username = username.trim().ifBlank { null }, email = email.trim().ifBlank { null }, nickname = nickname.trim().ifBlank { null }, tenantId = tenantId.trim().ifBlank { null })); _uiState.update { s -> s.copy(adminUsers = repository.adminUsers(), adminError = null) } }.onFailure { e -> _uiState.update { it.copy(adminError = e.message) } } } }
+    fun adjustAdminUserCredits(id: String, amount: Int, reason: String) { viewModelScope.launch { runCatching { repository.adjustAdminUserCredits(id, amount, reason); _uiState.update { s -> s.copy(adminUsers = repository.adminUsers(), adminError = null) } }.onFailure { e -> _uiState.update { it.copy(adminError = e.message) } } } }
+    fun loadAdminConversationUser(userId: String) { viewModelScope.launch { _uiState.update { it.copy(adminConversationUserId = userId, adminLoading = true) }; runCatching { repository.adminConversations(userId) }.onSuccess { items -> _uiState.update { it.copy(adminConversations = items, adminLoading = false) } }.onFailure { e -> _uiState.update { it.copy(adminLoading = false, adminError = e.message) } } } }
+    fun deleteAdminConversation(id: String) { viewModelScope.launch { runCatching { repository.deleteAdminConversation(id); _uiState.value.adminConversationUserId?.let { userId -> _uiState.update { s -> s.copy(adminConversations = repository.adminConversations(userId), adminConversationUsers = repository.adminConversationUsers()) } } }.onFailure { e -> _uiState.update { it.copy(adminError = e.message) } } } }
     fun toggleAdminUser(id: String, active: Boolean) { viewModelScope.launch { runCatching { repository.updateAdminUserStatus(id, active); _uiState.update { s -> s.copy(adminUsers = repository.adminUsers()) } }.onFailure { handleApiError(it as? Exception ?: Exception(it)) { s -> s } } } }
     fun changeAdminRole(id: String, role: String) { viewModelScope.launch { runCatching { repository.updateAdminUserRole(id, role); _uiState.update { s -> s.copy(adminUsers = repository.adminUsers()) } }.onFailure { handleApiError(it as? Exception ?: Exception(it)) { s -> s } } } }
     fun revokeAdminSession(id: String) { viewModelScope.launch { runCatching { repository.revokeAdminSession(id); _uiState.update { s -> s.copy(adminSessions = repository.adminSessions()) } }.onFailure { handleApiError(it as? Exception ?: Exception(it)) { s -> s } } } }
@@ -868,8 +873,10 @@ class AppViewModel(
 
     fun selectNode(nodeId: String) {
         _uiState.update {
+            val history = if (it.selectedNodeId != null && it.selectedNodeId != nodeId) it.graphNavigationHistory + it.selectedNodeId else it.graphNavigationHistory
             it.copy(
                 selectedNodeId = nodeId,
+                graphNavigationHistory = history.distinct(),
                 selectedNodeDetail = null,
                 noteDraft = "",
                 conversationId = null,
@@ -935,6 +942,14 @@ class AppViewModel(
                 noteDraft = "",
                 understandingCheck = null,
             )
+        }
+    }
+
+    fun goBackGraph() {
+        val previous = _uiState.value.graphNavigationHistory.lastOrNull() ?: return
+        _uiState.update { it.copy(selectedNodeId = previous, graphNavigationHistory = it.graphNavigationHistory.dropLast(1), selectedNodeDetail = null, noteDraft = "") }
+        viewModelScope.launch {
+            runCatching { repository.nodeDetail(previous) }.onSuccess { detail -> _uiState.update { it.copy(selectedNodeDetail = detail) } }
         }
     }
 
@@ -1069,13 +1084,13 @@ class AppViewModel(
         if (query.isBlank()) return
         viewModelScope.launch {
             runCatching { repository.search(query.trim()) }
-                .onSuccess { graph -> _uiState.update { it.copy(graphNodes = graph.nodes, graphRelations = graph.relations, graphCenterNodeId = graph.selectedNodeId, selectedNodeId = graph.selectedNodeId) } }
+                .onSuccess { graph -> _uiState.update { it.copy(graphNodes = graph.nodes, graphRelations = graph.relations, graphCenterNodeId = graph.selectedNodeId, selectedNodeId = graph.selectedNodeId, graphNavigationHistory = emptyList()) } }
                 .onFailure { handleApiError(it as? Exception ?: Exception(it)) { state -> state } }
         }
     }
 
     fun selectKnowledgeScope(scope: KnowledgeCatalogScope) {
-        _uiState.update { it.copy(selectedKnowledgeScope = scope, currentSubject = scope.subject, contentLoading = true, selectedNodeId = null, selectedNodeDetail = null) }
+        _uiState.update { it.copy(selectedKnowledgeScope = scope, currentSubject = scope.subject, contentLoading = true, selectedNodeId = null, selectedNodeDetail = null, graphNavigationHistory = emptyList()) }
         viewModelScope.launch {
             try {
                 val chapters = repository.knowledgeTree(scope)
@@ -1103,6 +1118,7 @@ class AppViewModel(
                 selectedKnowledgeScope = null,
                 selectedNodeId = null,
                 selectedNodeDetail = null,
+                graphNavigationHistory = emptyList(),
                 graphNodes = emptyList(),
                 graphRelations = emptyList(),
                 graphCenterNodeId = null,

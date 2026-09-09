@@ -78,10 +78,20 @@ interface QingkuiApi {
     suspend fun adminUserStatus(@Path("id") id: String, @Body body: Map<String, Boolean>): cn.qingkui.app.data.remote.dto.AdminUserDto
     @PATCH("admin/users/{id}/role")
     suspend fun adminUserRole(@Path("id") id: String, @Body body: Map<String, String>): cn.qingkui.app.data.remote.dto.AdminUserDto
+    @PATCH("admin/users/{id}")
+    suspend fun adminUserUpdate(@Path("id") id: String, @Body body: cn.qingkui.app.data.remote.dto.AdminUserUpdateRequest): cn.qingkui.app.data.remote.dto.AdminUserDto
+    @POST("admin/credits/{id}/adjust")
+    suspend fun adminCreditAdjust(@Path("id") id: String, @Body body: cn.qingkui.app.data.remote.dto.AdminCreditAdjustmentRequest): cn.qingkui.app.data.remote.dto.CreditDto
     @GET("admin/sessions")
     suspend fun adminSessions(@Query("active_only") activeOnly: Boolean = false, @Query("limit") limit: Int = 200): List<cn.qingkui.app.data.remote.dto.AdminSessionDto>
     @DELETE("admin/sessions/{id}")
     suspend fun revokeAdminSession(@Path("id") id: String): cn.qingkui.app.data.remote.dto.AdminSessionDto
+    @GET("admin/conversations/users")
+    suspend fun adminConversationUsers(@Query("q") query: String? = null, @Query("limit") limit: Int = 100): List<cn.qingkui.app.data.remote.dto.AdminConversationUserDto>
+    @GET("admin/conversations")
+    suspend fun adminConversations(@Query("user_id") userId: String, @Query("limit") limit: Int = 100): List<cn.qingkui.app.data.remote.dto.AdminConversationDto>
+    @DELETE("admin/conversations/{id}")
+    suspend fun deleteAdminConversation(@Path("id") id: String): retrofit2.Response<Unit>
     @GET("admin/knowledge/nodes")
     suspend fun adminKnowledgeNodes(@Query("review_status") reviewStatus: String? = null, @Query("limit") limit: Int = 200): List<cn.qingkui.app.data.remote.dto.AdminKnowledgeNodeDto>
     @PATCH("admin/knowledge/nodes/{id}")

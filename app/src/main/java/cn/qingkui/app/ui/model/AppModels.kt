@@ -75,7 +75,7 @@ data class WorkspaceTask(
     val errorCode: String? = null,
 )
 
-@Immutable data class AdminUserItem(val id: String, val username: String, val nickname: String, val role: String, val isActive: Boolean, val balance: Int = 0)
+@Immutable data class AdminUserItem(val id: String, val username: String, val nickname: String, val role: String, val isActive: Boolean, val balance: Int = 0, val email: String? = null, val tenantId: String? = null)
 @Immutable data class AdminSessionItem(val id: String, val username: String, val deviceName: String, val expiresAt: String, val active: Boolean)
 @Immutable data class AdminNodeItem(val id: String, val name: String, val subject: String, val grade: String, val chapter: String, val definition: String, val explanation: String, val reviewStatus: String, val isActive: Boolean, val version: Int, val sourceExcerpt: String)
 @Immutable data class AdminEdgeItem(val id: String, val sourceNodeId: String, val targetNodeId: String, val edgeType: String, val explanation: String)
@@ -86,6 +86,9 @@ data class WorkspaceTask(
 @Immutable data class AdminAlertItem(val severity: String, val code: String, val message: String, val value: Double, val threshold: Double)
 @Immutable data class AdminCheckItem(val id: String, val label: String, val passed: Boolean, val detail: String)
 @Immutable data class AdminFeedbackItem(val id: String, val category: String, val content: String, val status: String, val createdAt: String)
+@Immutable data class AdminConversationUserItem(val userId: String, val username: String, val nickname: String, val conversationCount: Int, val messageCount: Int, val latestActivityAt: String?)
+@Immutable data class AdminConversationMessageItem(val id: String, val role: String, val content: String, val createdAt: String)
+@Immutable data class AdminConversationItem(val id: String, val userId: String, val username: String, val title: String, val mode: String, val subject: String?, val updatedAt: String, val messages: List<AdminConversationMessageItem>)
 @Immutable data class CorpusItem(val title: String, val content: String, val keywords: List<String>, val subject: String, val category: String, val grade: String, val sourceDate: String, val sourceUrl: String)
 
 enum class MessageAuthor { Student, Assistant }
@@ -485,6 +488,7 @@ data class AppUiState(
      * from selectedNodeId, which represents the node currently shown in the
      * floating detail card. */
     val graphCenterNodeId: String? = null,
+    val graphNavigationHistory: List<String> = emptyList(),
     val knowledgeCatalog: List<KnowledgeCatalogScope> = emptyList(),
     val selectedKnowledgeScope: KnowledgeCatalogScope? = null,
     val knowledgeChapters: List<KnowledgeTreeChapter> = emptyList(),
@@ -532,6 +536,9 @@ data class AppUiState(
     val adminAlerts: List<AdminAlertItem> = emptyList(),
     val adminChecks: List<AdminCheckItem> = emptyList(),
     val adminFeedback: List<AdminFeedbackItem> = emptyList(),
+    val adminConversationUsers: List<AdminConversationUserItem> = emptyList(),
+    val adminConversations: List<AdminConversationItem> = emptyList(),
+    val adminConversationUserId: String? = null,
     val adminSection: String = "总览",
     val adminSearchQuery: String = "",
     val adminError: String? = null,

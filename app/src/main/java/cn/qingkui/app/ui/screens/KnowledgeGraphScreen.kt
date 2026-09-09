@@ -41,6 +41,7 @@ import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.CenterFocusStrong
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
@@ -116,6 +117,8 @@ fun KnowledgeGraphScreen(
     nodes: List<KnowledgeNode>,
     relations: List<KnowledgeRelation>,
     selectedNodeId: String?,
+    canGoBack: Boolean = false,
+    onGoBack: () -> Unit = {},
     onSelectNode: (String) -> Unit,
     onClearSelection: () -> Unit = {},
     onAskNode: (String) -> Unit,
@@ -178,6 +181,13 @@ fun KnowledgeGraphScreen(
             onSearchQueryChange = { searchQuery = it },
             subject = subject,
         )
+        if (canGoBack) {
+            OutlinedButton(onClick = onGoBack, modifier = Modifier.padding(top = 6.dp)) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回上一级")
+                Spacer(Modifier.width(6.dp))
+                Text("返回上一级")
+            }
+        }
         if (displayMode == GraphDisplayMode.Outline) {
             KnowledgeScopePicker(catalog, selectedScope, onSelectScope)
         } else {
