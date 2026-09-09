@@ -207,6 +207,7 @@ fun QingkuiApp() {
                         onUpdateUser = viewModel::updateAdminUser,
                         onAdjustCredits = viewModel::adjustAdminUserCredits,
                         onLoadConversationUser = viewModel::loadAdminConversationUser,
+                        onClearConversationUser = viewModel::clearAdminConversationUser,
                         onDeleteConversation = viewModel::deleteAdminConversation,
                         onApproveNode = viewModel::approveAdminNode,
                         onWithdrawNode = viewModel::withdrawAdminNode,
