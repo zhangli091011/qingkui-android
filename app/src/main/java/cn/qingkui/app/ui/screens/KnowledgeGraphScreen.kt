@@ -134,6 +134,7 @@ fun KnowledgeGraphScreen(
     selectedScope: KnowledgeCatalogScope? = null,
     chapters: List<KnowledgeTreeChapter> = emptyList(),
     onSelectScope: (KnowledgeCatalogScope) -> Unit = {},
+    onSelectSubject: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var displayMode by remember { mutableStateOf(GraphDisplayMode.Graph) }
@@ -180,6 +181,7 @@ fun KnowledgeGraphScreen(
         if (displayMode == GraphDisplayMode.Outline) {
             KnowledgeScopePicker(catalog, selectedScope, onSelectScope)
         } else {
+            if (showingScopeHierarchy) SubjectPicker(catalog.map { it.subject }.distinct(), subject, onSelectSubject)
             RelationFilterRow(selected = relationFilter, onSelect = { relationFilter = it })
         }
         Spacer(Modifier.height(12.dp))
@@ -231,6 +233,22 @@ fun KnowledgeGraphScreen(
             onDismiss = onDismissUnderstandingCheck,
         )
     }
+}
+
+@Composable
+private fun SubjectPicker(subjects: List<String>, selected: String, onSelect: (String) -> Unit) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        subjects.forEach { value ->
+            OutlinedButton(
+                onClick = { onSelect(value) },
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = if (value == selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                ),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+            ) { Text(value) }
+        }
+    }
+    Spacer(Modifier.height(6.dp))
 }
 
 /** Build the top-level navigation graph: subject nodes are the visual centres,

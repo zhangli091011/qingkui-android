@@ -1080,6 +1080,21 @@ class AppViewModel(
         }
     }
 
+    fun selectKnowledgeSubject(subject: String) {
+        _uiState.update {
+            it.copy(
+                currentSubject = subject,
+                selectedKnowledgeScope = null,
+                selectedNodeId = null,
+                selectedNodeDetail = null,
+                graphNodes = emptyList(),
+                graphRelations = emptyList(),
+                graphCenterNodeId = null,
+                knowledgeChapters = emptyList(),
+            )
+        }
+    }
+
     fun restoreSession(sessionId: String) {
         viewModelScope.launch {
             try {
