@@ -258,7 +258,7 @@ class AppViewModel(
                     it.subject == restoredScope.subject &&
                     it.grade == restoredScope.grade &&
                     it.textbookVersion == restoredScope.textbookVersion
-            } ?: catalog.firstOrNull { it.subject == _uiState.value.currentSubject } ?: catalog.firstOrNull()
+            }
             val chapters = if (scope != null) repository.knowledgeTree(scope) else emptyList()
             _uiState.update {
                 val retainedCenterId = it.graphCenterNodeId ?: graph.selectedNodeId
@@ -1059,12 +1059,22 @@ class AppViewModel(
     }
 
     fun selectKnowledgeScope(scope: KnowledgeCatalogScope) {
-        _uiState.update { it.copy(selectedKnowledgeScope = scope, currentSubject = scope.subject, contentLoading = true) }
+        _uiState.update { it.copy(selectedKnowledgeScope = scope, currentSubject = scope.subject, contentLoading = true, selectedNodeId = null, selectedNodeDetail = null) }
         viewModelScope.launch {
             try {
                 val chapters = repository.knowledgeTree(scope)
+                val firstNodeId = chapters.firstOrNull()?.sections?.firstOrNull()?.nodes?.firstOrNull()?.id
+                val graph = firstNodeId?.let { runCatching { repository.graph(it) }.getOrNull() }
                 _uiState.update { state ->
-                    if (state.selectedKnowledgeScope == scope) state.copy(knowledgeChapters = chapters, contentLoading = false) else state
+                    if (state.selectedKnowledgeScope == scope) state.copy(
+                        knowledgeChapters = chapters,
+                        graphNodes = graph?.nodes ?: emptyList(),
+                        graphRelations = graph?.relations ?: emptyList(),
+                        graphCenterNodeId = graph?.selectedNodeId,
+                        selectedNodeId = null,
+                        selectedNodeDetail = null,
+                        contentLoading = false,
+                    ) else state
                 }
             } catch (error: Exception) { handleApiError(error) { it.copy(contentLoading = false) } }
         }

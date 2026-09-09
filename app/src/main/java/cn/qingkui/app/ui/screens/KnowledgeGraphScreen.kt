@@ -139,6 +139,13 @@ fun KnowledgeGraphScreen(
     var displayMode by remember { mutableStateOf(GraphDisplayMode.Graph) }
     var relationFilter by remember { mutableStateOf<RelationType?>(null) }
     var searchQuery by remember { mutableStateOf("") }
+    // Keep the canvas scoped to one subject at a time. The subject itself is
+    // the centre node; grade nodes are its immediate branches. Other subjects
+    // remain available through the chapter/scope picker instead of being
+    // mixed into one dense cross-subject graph.
+    val scopedCatalog = remember(catalog, subject) { catalog.filter { it.subject == subject }.ifEmpty { catalog } }
+    val scopeGraph = remember(scopedCatalog) { buildScopeGraph(scopedCatalog) }
+    val showingScopeHierarchy = selectedScope == null && catalog.isNotEmpty()
     // The API can contain the same concept under multiple source records. Present one
     // canonical node and remap its branches so the canvas remains readable.
     val canonicalData = remember(nodes, relations) { canonicalizeGraph(nodes, relations) }
@@ -153,6 +160,9 @@ fun KnowledgeGraphScreen(
         }
     }
     val selectedNode = canonicalNodes.firstOrNull { it.id == canonicalSelectedId }
+    val renderedNodes = if (showingScopeHierarchy) scopeGraph.first else canonicalNodes
+    val renderedRelations = if (showingScopeHierarchy) scopeGraph.second else canonicalRelations
+    val renderedSelectedId = if (showingScopeHierarchy) null else canonicalSelectedId
     LaunchedEffect(searchQuery) {
         kotlinx.coroutines.delay(280)
         onSearch(searchQuery)
@@ -177,17 +187,21 @@ fun KnowledgeGraphScreen(
         Box(Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
             GraphContent(
                 displayMode,
-                visibleNodes,
-                canonicalNodes,
-                canonicalRelations,
+                if (showingScopeHierarchy) renderedNodes else visibleNodes,
+                renderedNodes,
+                renderedRelations,
                 relationFilter,
-                canonicalSelectedId,
+                renderedSelectedId,
                 chapters,
-                onSelectNode,
+                onSelectNode = { nodeId ->
+                    if (showingScopeHierarchy) {
+                        scopeGraph.third[nodeId]?.let(onSelectScope)
+                    } else onSelectNode(nodeId)
+                },
                 onClearSelection,
                 Modifier.fillMaxSize(),
             )
-            selectedNode?.let { node ->
+            if (!showingScopeHierarchy) selectedNode?.let { node ->
                 NodeDetailPanel(
                     node = node,
                     nodes = canonicalNodes,
@@ -217,6 +231,30 @@ fun KnowledgeGraphScreen(
             onDismiss = onDismissUnderstandingCheck,
         )
     }
+}
+
+/** Build the top-level navigation graph: subject nodes are the visual centres,
+ * with grades as their immediate children. Knowledge nodes are only loaded
+ * after a grade is chosen, keeping subject/grade scope explicit. */
+private fun buildScopeGraph(catalog: List<KnowledgeCatalogScope>): Triple<List<KnowledgeNode>, List<KnowledgeRelation>, Map<String, KnowledgeCatalogScope>> {
+    val nodes = mutableListOf<KnowledgeNode>()
+    val relations = mutableListOf<KnowledgeRelation>()
+    val scopes = linkedMapOf<String, KnowledgeCatalogScope>()
+    catalog.groupBy { it.subject }.toSortedMap().entries.forEachIndexed { subjectIndex, (subject, subjectScopes) ->
+        val centerId = "scope:subject:$subject"
+        val centerX = ((subjectIndex + 1f) / (catalog.map { it.subject }.distinct().size + 1f)).coerceIn(.2f, .8f)
+        nodes += KnowledgeNode(centerId, subject, "学科", KnowledgeStatus.Explored, centerX, .42f, KnowledgeKind.Concept, KnowledgeSource.Official, "${subject}知识图谱", "学科导航")
+        subjectScopes.distinctBy { it.grade }.forEachIndexed { gradeIndex, scope ->
+            val gradeId = "scope:grade:${scope.subject}:${scope.grade}:${scope.textbookVersion}"
+            val angle = (-Math.PI / 2.0) + (Math.PI * (gradeIndex + 1) / (subjectScopes.distinctBy { it.grade }.size + 1))
+            val x = (centerX + .22f * kotlin.math.cos(angle)).coerceIn(.08, .92).toFloat()
+            val y = (.42 + .28 * kotlin.math.sin(angle)).coerceIn(.18, .82).toFloat()
+            nodes += KnowledgeNode(gradeId, scope.grade, scope.textbookVersion, KnowledgeStatus.Unexplored, x, y, KnowledgeKind.Concept, KnowledgeSource.Official, "${scope.subject} · ${scope.grade} · ${scope.nodeCount} 个知识点", "${scope.subject} · ${scope.grade}")
+            relations += KnowledgeRelation(centerId, gradeId, RelationType.Extension)
+            scopes[gradeId] = scope
+        }
+    }
+    return Triple(nodes, relations, scopes)
 }
 
 private fun canonicalizeGraph(
