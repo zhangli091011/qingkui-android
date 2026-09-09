@@ -82,6 +82,15 @@ import cn.qingkui.app.ui.model.WorkspaceMetricSnapshot
 import cn.qingkui.app.ui.model.WorkspaceTask
 import cn.qingkui.app.ui.model.AdminUserItem
 import cn.qingkui.app.ui.model.AdminSessionItem
+import cn.qingkui.app.ui.model.AdminNodeItem
+import cn.qingkui.app.ui.model.AdminEdgeItem
+import cn.qingkui.app.ui.model.AdminDocumentItem
+import cn.qingkui.app.ui.model.AdminFormulaItem
+import cn.qingkui.app.ui.model.AdminOcrItem
+import cn.qingkui.app.ui.model.AdminAuditItem
+import cn.qingkui.app.ui.model.AdminAlertItem
+import cn.qingkui.app.ui.model.AdminCheckItem
+import cn.qingkui.app.ui.model.AdminFeedbackItem
 import cn.qingkui.app.ui.model.CorpusItem
 import com.google.gson.Gson
 import com.google.gson.JsonParser
@@ -133,6 +142,23 @@ interface AppRepository {
     suspend fun updateAdminUserStatus(id: String, active: Boolean): AdminUserItem? = null
     suspend fun updateAdminUserRole(id: String, role: String): AdminUserItem? = null
     suspend fun revokeAdminSession(id: String): AdminSessionItem? = null
+    suspend fun adminKnowledgeNodes(): List<AdminNodeItem> = emptyList()
+    suspend fun updateAdminKnowledgeNode(id: String, request: cn.qingkui.app.data.remote.dto.AdminNodeUpdateRequest): AdminNodeItem? = null
+    suspend fun publishAdminKnowledgeNode(id: String): AdminNodeItem? = null
+    suspend fun withdrawAdminKnowledgeNode(id: String): AdminNodeItem? = null
+    suspend fun adminKnowledgeEdges(): List<AdminEdgeItem> = emptyList()
+    suspend fun deleteAdminKnowledgeEdge(id: String) {}
+    suspend fun adminDocuments(): List<AdminDocumentItem> = emptyList()
+    suspend fun adminFormulas(): List<AdminFormulaItem> = emptyList()
+    suspend fun reviewAdminFormula(id: String, status: String): AdminFormulaItem? = null
+    suspend fun adminOcrTasks(): List<AdminOcrItem> = emptyList()
+    suspend fun retryAdminOcrTask(id: String): AdminOcrItem? = null
+    suspend fun cancelAdminOcrTask(id: String): AdminOcrItem? = null
+    suspend fun adminAuditLogs(): List<AdminAuditItem> = emptyList()
+    suspend fun adminReleaseChecks(): Pair<Boolean, List<AdminCheckItem>> = false to emptyList()
+    suspend fun adminGovernance(): Map<String, Int> = emptyMap()
+    suspend fun adminAlerts(): List<AdminAlertItem> = emptyList()
+    suspend fun adminFeedback(): List<AdminFeedbackItem> = emptyList()
     suspend fun generateCorpus(subject: String, category: String, topic: String?, grade: String, count: Int): List<CorpusItem> = emptyList()
     suspend fun hasSession(): Boolean
     suspend fun nickname(): String?
@@ -296,6 +322,23 @@ class NetworkAppRepository(
     override suspend fun updateAdminUserStatus(id: String, active: Boolean): AdminUserItem = apiCall { api.adminUserStatus(id, mapOf("is_active" to active)).toAdminUser() }
     override suspend fun updateAdminUserRole(id: String, role: String): AdminUserItem = apiCall { api.adminUserRole(id, mapOf("role" to role)).toAdminUser() }
     override suspend fun revokeAdminSession(id: String): AdminSessionItem = apiCall { api.revokeAdminSession(id).toAdminSession() }
+    override suspend fun adminKnowledgeNodes(): List<AdminNodeItem> = apiCall { api.adminKnowledgeNodes().map { AdminNodeItem(it.id,it.name,it.subject,it.grade,it.chapter,it.definition,it.explanation,it.reviewStatus,it.isActive,it.version,it.sourceExcerpt) } }
+    override suspend fun updateAdminKnowledgeNode(id: String, request: cn.qingkui.app.data.remote.dto.AdminNodeUpdateRequest): AdminNodeItem = apiCall { api.updateAdminKnowledgeNode(id,request).let { AdminNodeItem(it.id,it.name,it.subject,it.grade,it.chapter,it.definition,it.explanation,it.reviewStatus,it.isActive,it.version,it.sourceExcerpt) } }
+    override suspend fun publishAdminKnowledgeNode(id: String): AdminNodeItem = apiCall { api.publishAdminKnowledgeNode(id).let { AdminNodeItem(it.id,it.name,it.subject,it.grade,it.chapter,it.definition,it.explanation,it.reviewStatus,it.isActive,it.version,it.sourceExcerpt) } }
+    override suspend fun withdrawAdminKnowledgeNode(id: String): AdminNodeItem = apiCall { api.withdrawAdminKnowledgeNode(id).let { AdminNodeItem(it.id,it.name,it.subject,it.grade,it.chapter,it.definition,it.explanation,it.reviewStatus,it.isActive,it.version,it.sourceExcerpt) } }
+    override suspend fun adminKnowledgeEdges(): List<AdminEdgeItem> = apiCall { api.adminKnowledgeEdges().map { AdminEdgeItem(it.id,it.sourceNodeId,it.targetNodeId,it.edgeType,it.explanation) } }
+    override suspend fun deleteAdminKnowledgeEdge(id: String) { apiCall { api.deleteAdminKnowledgeEdge(id); Unit } }
+    override suspend fun adminDocuments(): List<AdminDocumentItem> = apiCall { api.adminKnowledgeDocuments().items.map { AdminDocumentItem(it.id,it.title,it.subject,it.grade,it.status,it.authorizationStatus,it.chunkCount,it.formulaCount,it.pendingFormulaCount,it.updatedAt) } }
+    override suspend fun adminFormulas(): List<AdminFormulaItem> = apiCall { api.adminFormulaQueue("all").items.map { AdminFormulaItem(it.id,it.documentTitle,it.subject,it.chapter,it.formulaLatex,it.ocrConfidence,it.reviewStatus,it.reviewNote) } }
+    override suspend fun reviewAdminFormula(id: String, status: String): AdminFormulaItem = apiCall { api.reviewAdminFormula(id,cn.qingkui.app.data.remote.dto.AdminFormulaUpdateRequest(status)).let { AdminFormulaItem(it.id,it.documentTitle,it.subject,it.chapter,it.formulaLatex,it.ocrConfidence,it.reviewStatus,it.reviewNote) } }
+    override suspend fun adminOcrTasks(): List<AdminOcrItem> = apiCall { api.adminOcrTasks().map { AdminOcrItem(it.id,it.mistakeId,it.userId,it.status,it.createdAt,it.errorCode) } }
+    override suspend fun retryAdminOcrTask(id: String): AdminOcrItem = apiCall { api.retryAdminOcrTask(id).let { AdminOcrItem(it.id,it.mistakeId,it.userId,it.status,it.createdAt,it.errorCode) } }
+    override suspend fun cancelAdminOcrTask(id: String): AdminOcrItem = apiCall { api.cancelAdminOcrTask(id).let { AdminOcrItem(it.id,it.mistakeId,it.userId,it.status,it.createdAt,it.errorCode) } }
+    override suspend fun adminAuditLogs(): List<AdminAuditItem> = apiCall { api.adminAuditLogs().map { AdminAuditItem(it.id,it.actorUserId,it.action,it.targetType,it.targetId,it.createdAt) } }
+    override suspend fun adminReleaseChecks(): Pair<Boolean,List<AdminCheckItem>> = apiCall { val r=api.adminReleaseReadiness(); r.ready to r.checks.map { AdminCheckItem(it["id"]?.toString().orEmpty(),it["label"]?.toString() ?: it["description"]?.toString().orEmpty(),it["passed"] == true,it["reason"]?.toString() ?: "") } }
+    override suspend fun adminGovernance(): Map<String, Int> = apiCall { val r=api.adminGovernanceReport(); (r.nodes+r.documents+r.relations+r.blockerCounts).mapValues { it.value } }
+    override suspend fun adminAlerts(): List<AdminAlertItem> = apiCall { api.adminOperationalAlerts().alerts.map { AdminAlertItem(it.severity,it.code,it.message,it.value,it.threshold) } }
+    override suspend fun adminFeedback(): List<AdminFeedbackItem> = apiCall { api.adminFeedback().map { AdminFeedbackItem(it.id,it.category,it.content,it.status,it.createdAt) } }
     override suspend fun generateCorpus(subject: String, category: String, topic: String?, grade: String, count: Int): List<CorpusItem> = apiCall { api.generateCorpus(cn.qingkui.app.data.remote.dto.CorpusGenerateRequest(subject, category, topic, grade, count)).items.map { CorpusItem(it.title, it.content, it.keywords, it.subject, it.category, it.grade, it.sourceDate, it.sourceUrl) } }
 
     override suspend fun hasSession(): Boolean = tokenStore.refreshToken() != null

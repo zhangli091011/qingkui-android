@@ -82,6 +82,50 @@ interface QingkuiApi {
     suspend fun adminSessions(@Query("active_only") activeOnly: Boolean = false, @Query("limit") limit: Int = 200): List<cn.qingkui.app.data.remote.dto.AdminSessionDto>
     @DELETE("admin/sessions/{id}")
     suspend fun revokeAdminSession(@Path("id") id: String): cn.qingkui.app.data.remote.dto.AdminSessionDto
+    @GET("admin/knowledge/nodes")
+    suspend fun adminKnowledgeNodes(@Query("review_status") reviewStatus: String? = null, @Query("limit") limit: Int = 200): List<cn.qingkui.app.data.remote.dto.AdminKnowledgeNodeDto>
+    @PATCH("admin/knowledge/nodes/{id}")
+    suspend fun updateAdminKnowledgeNode(@Path("id") id: String, @Body body: cn.qingkui.app.data.remote.dto.AdminNodeUpdateRequest): cn.qingkui.app.data.remote.dto.AdminKnowledgeNodeDto
+    @POST("admin/knowledge/nodes/{id}/publish")
+    suspend fun publishAdminKnowledgeNode(@Path("id") id: String, @Body body: cn.qingkui.app.data.remote.dto.AdminNodeActionRequest = cn.qingkui.app.data.remote.dto.AdminNodeActionRequest()): cn.qingkui.app.data.remote.dto.AdminKnowledgeNodeDto
+    @POST("admin/knowledge/nodes/{id}/withdraw")
+    suspend fun withdrawAdminKnowledgeNode(@Path("id") id: String, @Body body: cn.qingkui.app.data.remote.dto.AdminNodeActionRequest = cn.qingkui.app.data.remote.dto.AdminNodeActionRequest()): cn.qingkui.app.data.remote.dto.AdminKnowledgeNodeDto
+    @POST("admin/knowledge/nodes/{id}/restore")
+    suspend fun restoreAdminKnowledgeNode(@Path("id") id: String, @Body body: cn.qingkui.app.data.remote.dto.AdminNodeRestoreRequest): cn.qingkui.app.data.remote.dto.AdminKnowledgeNodeDto
+    @GET("admin/knowledge/edges")
+    suspend fun adminKnowledgeEdges(@Query("limit") limit: Int = 300): List<cn.qingkui.app.data.remote.dto.AdminKnowledgeEdgeDto>
+    @POST("admin/knowledge/edges")
+    suspend fun createAdminKnowledgeEdge(@Body body: cn.qingkui.app.data.remote.dto.AdminEdgeCreateRequest): cn.qingkui.app.data.remote.dto.AdminKnowledgeEdgeDto
+    @PATCH("admin/knowledge/edges/{id}")
+    suspend fun updateAdminKnowledgeEdge(@Path("id") id: String, @Body body: cn.qingkui.app.data.remote.dto.AdminEdgeUpdateRequest): cn.qingkui.app.data.remote.dto.AdminKnowledgeEdgeDto
+    @DELETE("admin/knowledge/edges/{id}")
+    suspend fun deleteAdminKnowledgeEdge(@Path("id") id: String): retrofit2.Response<Unit>
+    @GET("admin/knowledge/documents")
+    suspend fun adminKnowledgeDocuments(@Query("limit") limit: Int = 100): cn.qingkui.app.data.remote.dto.AdminDocumentListDto
+    @PATCH("admin/knowledge/documents/{id}")
+    suspend fun updateAdminKnowledgeDocument(@Path("id") id: String, @Body body: cn.qingkui.app.data.remote.dto.AdminDocumentUpdateRequest): cn.qingkui.app.data.remote.dto.AdminKnowledgeDocumentDto
+    @GET("admin/knowledge/formulas")
+    suspend fun adminFormulaQueue(@Query("review_status") reviewStatus: String = "pending", @Query("limit") limit: Int = 100): cn.qingkui.app.data.remote.dto.AdminFormulaQueueDto
+    @PATCH("admin/knowledge/formulas/{id}")
+    suspend fun reviewAdminFormula(@Path("id") id: String, @Body body: cn.qingkui.app.data.remote.dto.AdminFormulaUpdateRequest): cn.qingkui.app.data.remote.dto.AdminFormulaReviewDto
+    @GET("admin/ocr-tasks")
+    suspend fun adminOcrTasks(@Query("limit") limit: Int = 100): List<cn.qingkui.app.data.remote.dto.AdminOcrTaskDto>
+    @POST("admin/ocr-tasks/{id}/retry")
+    suspend fun retryAdminOcrTask(@Path("id") id: String): cn.qingkui.app.data.remote.dto.AdminOcrTaskDto
+    @POST("admin/ocr-tasks/{id}/cancel")
+    suspend fun cancelAdminOcrTask(@Path("id") id: String): cn.qingkui.app.data.remote.dto.AdminOcrTaskDto
+    @GET("admin/audit-logs")
+    suspend fun adminAuditLogs(@Query("limit") limit: Int = 100): List<cn.qingkui.app.data.remote.dto.AdminAuditLogDto>
+    @GET("admin/release-readiness")
+    suspend fun adminReleaseReadiness(): cn.qingkui.app.data.remote.dto.AdminReleaseReadinessDto
+    @GET("admin/knowledge/governance")
+    suspend fun adminGovernanceReport(@Query("subject") subject: String? = null, @Query("grade") grade: String? = null): cn.qingkui.app.data.remote.dto.AdminGovernanceReportDto
+    @GET("admin/operational-alerts")
+    suspend fun adminOperationalAlerts(): cn.qingkui.app.data.remote.dto.AdminOperationalAlertSummaryDto
+    @GET("admin/feedback")
+    suspend fun adminFeedback(@Query("limit") limit: Int = 100): List<cn.qingkui.app.data.remote.dto.AdminFeedbackDto>
+    @PATCH("admin/feedback/{id}")
+    suspend fun updateAdminFeedback(@Path("id") id: String, @Body body: Map<String, String>): cn.qingkui.app.data.remote.dto.AdminFeedbackDto
     @POST("corpus/generate")
     suspend fun generateCorpus(@Body body: cn.qingkui.app.data.remote.dto.CorpusGenerateRequest): cn.qingkui.app.data.remote.dto.CorpusGenerateResponseDto
 

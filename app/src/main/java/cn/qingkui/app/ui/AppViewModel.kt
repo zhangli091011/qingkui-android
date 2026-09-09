@@ -433,12 +433,22 @@ class AppViewModel(
 
     fun openAdminConsole() {
         viewModelScope.launch {
-            _uiState.update { it.copy(destination = AppDestination.AdminConsole, drawerOpen = false, adminLoading = true) }
+            _uiState.update { it.copy(destination = AppDestination.AdminConsole, drawerOpen = false, adminLoading = true, adminError = null) }
             runCatching {
-                val users = repository.adminUsers()
-                val sessions = repository.adminSessions()
-                _uiState.update { it.copy(adminUsers = users, adminSessions = sessions, adminLoading = false) }
-            }.onFailure { handleApiError(it as? Exception ?: Exception(it)) { state -> state.copy(adminLoading = false) } }
+                val users = runCatching { repository.adminUsers() }.getOrDefault(emptyList())
+                val sessions = runCatching { repository.adminSessions() }.getOrDefault(emptyList())
+                val nodes = runCatching { repository.adminKnowledgeNodes() }.getOrDefault(emptyList())
+                val edges = runCatching { repository.adminKnowledgeEdges() }.getOrDefault(emptyList())
+                val docs = runCatching { repository.adminDocuments() }.getOrDefault(emptyList())
+                val formulas = runCatching { repository.adminFormulas() }.getOrDefault(emptyList())
+                val ocr = runCatching { repository.adminOcrTasks() }.getOrDefault(emptyList())
+                val logs = runCatching { repository.adminAuditLogs() }.getOrDefault(emptyList())
+                val alerts = runCatching { repository.adminAlerts() }.getOrDefault(emptyList())
+                val checks = runCatching { repository.adminReleaseChecks() }.getOrDefault(false to emptyList())
+                runCatching { repository.adminGovernance() }
+                val feedback = runCatching { repository.adminFeedback() }.getOrDefault(emptyList())
+                _uiState.update { it.copy(adminUsers = users, adminSessions = sessions, adminNodes = nodes, adminEdges = edges, adminDocuments = docs, adminFormulas = formulas, adminOcrTasks = ocr, adminAuditLogs = logs, adminAlerts = alerts, adminChecks = checks.second, adminFeedback = feedback, adminLoading = false, adminError = null) }
+            }.onFailure { error -> _uiState.update { it.copy(adminLoading = false, adminError = error.message ?: "管理数据加载失败") } }
         }
     }
 
@@ -447,6 +457,12 @@ class AppViewModel(
     fun toggleAdminUser(id: String, active: Boolean) { viewModelScope.launch { runCatching { repository.updateAdminUserStatus(id, active); _uiState.update { s -> s.copy(adminUsers = repository.adminUsers()) } }.onFailure { handleApiError(it as? Exception ?: Exception(it)) { s -> s } } } }
     fun changeAdminRole(id: String, role: String) { viewModelScope.launch { runCatching { repository.updateAdminUserRole(id, role); _uiState.update { s -> s.copy(adminUsers = repository.adminUsers()) } }.onFailure { handleApiError(it as? Exception ?: Exception(it)) { s -> s } } } }
     fun revokeAdminSession(id: String) { viewModelScope.launch { runCatching { repository.revokeAdminSession(id); _uiState.update { s -> s.copy(adminSessions = repository.adminSessions()) } }.onFailure { handleApiError(it as? Exception ?: Exception(it)) { s -> s } } } }
+    fun approveAdminNode(id: String) { viewModelScope.launch { runCatching { repository.publishAdminKnowledgeNode(id); _uiState.update { s -> s.copy(adminNodes = repository.adminKnowledgeNodes()) } }.onFailure { e -> _uiState.update { it.copy(adminError = e.message) } } } }
+    fun withdrawAdminNode(id: String) { viewModelScope.launch { runCatching { repository.withdrawAdminKnowledgeNode(id); _uiState.update { s -> s.copy(adminNodes = repository.adminKnowledgeNodes()) } }.onFailure { e -> _uiState.update { it.copy(adminError = e.message) } } } }
+    fun deleteAdminEdge(id: String) { viewModelScope.launch { runCatching { repository.deleteAdminKnowledgeEdge(id); _uiState.update { s -> s.copy(adminEdges = repository.adminKnowledgeEdges()) } }.onFailure { e -> _uiState.update { it.copy(adminError = e.message) } } } }
+    fun reviewAdminFormula(id: String, status: String) { viewModelScope.launch { runCatching { repository.reviewAdminFormula(id,status); _uiState.update { s -> s.copy(adminFormulas = repository.adminFormulas()) } }.onFailure { e -> _uiState.update { it.copy(adminError = e.message) } } } }
+    fun retryAdminOcr(id: String) { viewModelScope.launch { runCatching { repository.retryAdminOcrTask(id); _uiState.update { s -> s.copy(adminOcrTasks = repository.adminOcrTasks()) } }.onFailure { e -> _uiState.update { it.copy(adminError = e.message) } } } }
+    fun cancelAdminOcr(id: String) { viewModelScope.launch { runCatching { repository.cancelAdminOcrTask(id); _uiState.update { s -> s.copy(adminOcrTasks = repository.adminOcrTasks()) } }.onFailure { e -> _uiState.update { it.copy(adminError = e.message) } } } }
     fun generateCorpus(subject: String, category: String, topic: String?, grade: String = "高中", count: Int = 3) {
         viewModelScope.launch {
             _uiState.update { it.copy(corpusLoading = true) }

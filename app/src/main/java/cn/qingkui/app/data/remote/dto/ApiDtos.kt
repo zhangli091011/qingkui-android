@@ -408,6 +408,46 @@ data class AdminSessionDto(
     val active: Boolean = true,
 )
 
+data class AdminKnowledgeSourceDto(val id: String = "", val title: String = "", val publisher: String? = null, val location: String = "", @SerializedName("authorization_status") val authorizationStatus: String = "")
+data class AdminKnowledgeNodeDto(
+    val id: String, val name: String, val subject: String = "", val grade: String = "", val chapter: String = "", val section: String = "本章知识点",
+    val definition: String = "", val explanation: String = "", @SerializedName("common_errors") val commonErrors: List<String> = emptyList(),
+    @SerializedName("question_types") val questionTypes: List<String> = emptyList(), @SerializedName("source_excerpt") val sourceExcerpt: String = "",
+    val version: Int = 1, @SerializedName("review_status") val reviewStatus: String = "draft", @SerializedName("updated_at") val updatedAt: String = "",
+    val source: AdminKnowledgeSourceDto? = null, @SerializedName("is_active") val isActive: Boolean = true, val note: String? = null,
+)
+data class AdminKnowledgeEdgeDto(val id: String, @SerializedName("source_node_id") val sourceNodeId: String, @SerializedName("target_node_id") val targetNodeId: String, @SerializedName("edge_type") val edgeType: String, val explanation: String = "")
+data class AdminKnowledgeDocumentDto(
+    val id: String, val title: String, val subject: String? = null, val grade: String? = null, @SerializedName("textbook_version") val textbookVersion: String? = null,
+    val chapter: String? = null, @SerializedName("document_role") val documentRole: String? = null, @SerializedName("source_type") val sourceType: String = "",
+    @SerializedName("source_uri") val sourceUri: String = "", @SerializedName("authorization_status") val authorizationStatus: String = "",
+    @SerializedName("checksum_sha256") val checksumSha256: String = "", @SerializedName("mime_type") val mimeType: String? = null, val status: String = "",
+    @SerializedName("error_message") val errorMessage: String? = null, @SerializedName("chunk_count") val chunkCount: Int = 0, @SerializedName("formula_count") val formulaCount: Int = 0,
+    @SerializedName("pending_formula_count") val pendingFormulaCount: Int = 0, @SerializedName("created_at") val createdAt: String = "", @SerializedName("updated_at") val updatedAt: String = "",
+)
+data class AdminDocumentListDto(val total: Int = 0, val offset: Int = 0, val limit: Int = 50, val items: List<AdminKnowledgeDocumentDto> = emptyList())
+data class AdminFormulaReviewDto(
+    val id: String, @SerializedName("document_id") val documentId: String = "", @SerializedName("document_title") val documentTitle: String = "", val subject: String? = null,
+    val chapter: String? = null, val sequence: Int = 0, @SerializedName("formula_latex") val formulaLatex: String? = null, @SerializedName("formula_source") val formulaSource: String? = null,
+    @SerializedName("ocr_confidence") val ocrConfidence: Double? = null, @SerializedName("review_status") val reviewStatus: String? = null, @SerializedName("review_note") val reviewNote: String? = null,
+)
+data class AdminFormulaQueueDto(val total: Int = 0, val offset: Int = 0, val limit: Int = 50, val items: List<AdminFormulaReviewDto> = emptyList())
+data class AdminOcrTaskDto(val id: String, @SerializedName("mistake_id") val mistakeId: String = "", @SerializedName("user_id") val userId: String = "", val status: String = "", @SerializedName("created_at") val createdAt: String = "", @SerializedName("updated_at") val updatedAt: String? = null, @SerializedName("error_code") val errorCode: String? = null)
+data class AdminAuditLogDto(val id: String, @SerializedName("actor_user_id") val actorUserId: String? = null, val action: String = "", @SerializedName("target_type") val targetType: String = "", @SerializedName("target_id") val targetId: String? = null, val details: Map<String, Any?> = emptyMap(), @SerializedName("created_at") val createdAt: String = "")
+data class AdminOperationalAlertDto(val severity: String = "warning", val code: String = "", val message: String = "", val value: Double = 0.0, val threshold: Double = 0.0)
+data class AdminOperationalAlertSummaryDto(val status: String = "ok", @SerializedName("generated_at") val generatedAt: String = "", val metrics: Map<String, Any?> = emptyMap(), val alerts: List<AdminOperationalAlertDto> = emptyList())
+data class AdminGovernanceCandidateDto(val id: String = "", val name: String = "", val chapter: String = "", @SerializedName("review_status") val reviewStatus: String = "", val publishable: Boolean = false, val blockers: List<String> = emptyList())
+data class AdminGovernanceReportDto(val scope: Map<String, String> = emptyMap(), val nodes: Map<String, Int> = emptyMap(), val documents: Map<String, Int> = emptyMap(), val relations: Map<String, Int> = emptyMap(), @SerializedName("blocker_counts") val blockerCounts: Map<String, Int> = emptyMap(), val candidates: List<AdminGovernanceCandidateDto> = emptyList())
+data class AdminReleaseReadinessDto(val ready: Boolean = false, val checks: List<Map<String, Any?>> = emptyList(), val blockers: List<String> = emptyList(), val generatedAt: String? = null)
+data class AdminFeedbackDto(val id: String, val category: String = "", val content: String = "", @SerializedName("node_id") val nodeId: String? = null, val status: String = "", @SerializedName("created_at") val createdAt: String = "")
+data class AdminNodeUpdateRequest(val name: String? = null, val chapter: String? = null, val section: String? = null, val definition: String? = null, val explanation: String? = null, @SerializedName("common_errors") val commonErrors: List<String>? = null, @SerializedName("question_types") val questionTypes: List<String>? = null, @SerializedName("source_id") val sourceId: String? = null, @SerializedName("source_excerpt") val sourceExcerpt: String? = null, @SerializedName("review_status") val reviewStatus: String? = null, @SerializedName("is_active") val isActive: Boolean? = null)
+data class AdminEdgeCreateRequest(@SerializedName("source_node_id") val sourceNodeId: String, @SerializedName("target_node_id") val targetNodeId: String, @SerializedName("edge_type") val edgeType: String, val explanation: String)
+data class AdminEdgeUpdateRequest(@SerializedName("edge_type") val edgeType: String? = null, val explanation: String? = null)
+data class AdminNodeActionRequest(@SerializedName("change_note") val changeNote: String? = null)
+data class AdminNodeRestoreRequest(val version: Int, @SerializedName("change_note") val changeNote: String? = null, val publish: Boolean = false)
+data class AdminFormulaUpdateRequest(@SerializedName("review_status") val reviewStatus: String, @SerializedName("formula_latex") val formulaLatex: String? = null, @SerializedName("review_note") val reviewNote: String? = null)
+data class AdminDocumentUpdateRequest(val title: String? = null, val subject: String? = null, val grade: String? = null, @SerializedName("textbook_version") val textbookVersion: String? = null, val chapter: String? = null, @SerializedName("document_role") val documentRole: String? = null, @SerializedName("authorization_status") val authorizationStatus: String? = null, val status: String? = null)
+
 data class CorpusGenerateRequest(val subject: String, val category: String = "综合", val topic: String? = null, val grade: String = "高中", val count: Int = 3)
 data class CorpusItemDto(val title: String, val content: String, val keywords: List<String> = emptyList(), val subject: String = "", val category: String = "", val grade: String = "", @SerializedName("source_date") val sourceDate: String = "", @SerializedName("source_url") val sourceUrl: String = "")
 data class CorpusGenerateResponseDto(val items: List<CorpusItemDto> = emptyList())

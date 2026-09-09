@@ -77,6 +77,15 @@ data class WorkspaceTask(
 
 @Immutable data class AdminUserItem(val id: String, val username: String, val nickname: String, val role: String, val isActive: Boolean, val balance: Int = 0)
 @Immutable data class AdminSessionItem(val id: String, val username: String, val deviceName: String, val expiresAt: String, val active: Boolean)
+@Immutable data class AdminNodeItem(val id: String, val name: String, val subject: String, val grade: String, val chapter: String, val definition: String, val explanation: String, val reviewStatus: String, val isActive: Boolean, val version: Int, val sourceExcerpt: String)
+@Immutable data class AdminEdgeItem(val id: String, val sourceNodeId: String, val targetNodeId: String, val edgeType: String, val explanation: String)
+@Immutable data class AdminDocumentItem(val id: String, val title: String, val subject: String?, val grade: String?, val status: String, val authorizationStatus: String, val chunkCount: Int, val formulaCount: Int, val pendingFormulaCount: Int, val updatedAt: String)
+@Immutable data class AdminFormulaItem(val id: String, val documentTitle: String, val subject: String?, val chapter: String?, val formulaLatex: String?, val confidence: Double?, val reviewStatus: String?, val reviewNote: String?)
+@Immutable data class AdminOcrItem(val id: String, val mistakeId: String, val userId: String, val status: String, val createdAt: String, val errorCode: String?)
+@Immutable data class AdminAuditItem(val id: String, val actorUserId: String?, val action: String, val targetType: String, val targetId: String?, val createdAt: String)
+@Immutable data class AdminAlertItem(val severity: String, val code: String, val message: String, val value: Double, val threshold: Double)
+@Immutable data class AdminCheckItem(val id: String, val label: String, val passed: Boolean, val detail: String)
+@Immutable data class AdminFeedbackItem(val id: String, val category: String, val content: String, val status: String, val createdAt: String)
 @Immutable data class CorpusItem(val title: String, val content: String, val keywords: List<String>, val subject: String, val category: String, val grade: String, val sourceDate: String, val sourceUrl: String)
 
 enum class MessageAuthor { Student, Assistant }
@@ -514,7 +523,18 @@ data class AppUiState(
     val adminAccessToken: String? = null,
     val adminUsers: List<AdminUserItem> = emptyList(),
     val adminSessions: List<AdminSessionItem> = emptyList(),
+    val adminNodes: List<AdminNodeItem> = emptyList(),
+    val adminEdges: List<AdminEdgeItem> = emptyList(),
+    val adminDocuments: List<AdminDocumentItem> = emptyList(),
+    val adminFormulas: List<AdminFormulaItem> = emptyList(),
+    val adminOcrTasks: List<AdminOcrItem> = emptyList(),
+    val adminAuditLogs: List<AdminAuditItem> = emptyList(),
+    val adminAlerts: List<AdminAlertItem> = emptyList(),
+    val adminChecks: List<AdminCheckItem> = emptyList(),
+    val adminFeedback: List<AdminFeedbackItem> = emptyList(),
     val adminSection: String = "总览",
+    val adminSearchQuery: String = "",
+    val adminError: String? = null,
     val adminLoading: Boolean = false,
     val corpusItems: List<CorpusItem> = emptyList(),
     val corpusLoading: Boolean = false,
