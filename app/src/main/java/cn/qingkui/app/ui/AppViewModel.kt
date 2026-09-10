@@ -1128,6 +1128,28 @@ class AppViewModel(
         }
     }
 
+    /**
+     * Leave the subject/grade scope and go back to the subject + grade canvas.
+     *
+     * Without this the graph had no way back: choosing a scope hides the subject
+     * picker, so the only reachable action was undoing a knowledge-node drill-down.
+     */
+    fun exitKnowledgeScope() {
+        _uiState.update {
+            it.copy(
+                selectedKnowledgeScope = null,
+                selectedNodeId = null,
+                selectedNodeDetail = null,
+                graphNavigationHistory = emptyList(),
+                graphNodes = emptyList(),
+                graphRelations = emptyList(),
+                graphCenterNodeId = null,
+                knowledgeChapters = emptyList(),
+                contentLoading = false,
+            )
+        }
+    }
+
     fun restoreSession(sessionId: String) {
         viewModelScope.launch {
             try {

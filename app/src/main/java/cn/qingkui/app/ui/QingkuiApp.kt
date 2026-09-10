@@ -300,6 +300,7 @@ fun QingkuiApp() {
                         chapters = uiState.knowledgeChapters,
                         onSelectScope = viewModel::selectKnowledgeScope,
                         onSelectSubject = viewModel::selectKnowledgeSubject,
+                        onBackToSubjects = viewModel::exitKnowledgeScope,
                     )
                     AppDestination.Learning -> LearningScreen(
                         compact = compact,

@@ -138,6 +138,7 @@ fun KnowledgeGraphScreen(
     chapters: List<KnowledgeTreeChapter> = emptyList(),
     onSelectScope: (KnowledgeCatalogScope) -> Unit = {},
     onSelectSubject: (String) -> Unit = {},
+    onBackToSubjects: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var displayMode by remember { mutableStateOf(GraphDisplayMode.Graph) }
@@ -181,17 +182,46 @@ fun KnowledgeGraphScreen(
             onSearchQueryChange = { searchQuery = it },
             subject = subject,
         )
-        if (canGoBack) {
-            OutlinedButton(onClick = onGoBack, modifier = Modifier.padding(top = 6.dp)) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回上一级")
-                Spacer(Modifier.width(6.dp))
-                Text("返回上一级")
+        // Back affordances, deepest level first:
+        //   scope (subject + grade chosen)  ->  back to the subject/grade canvas
+        //   knowledge drill-down history    ->  back to the previous knowledge node
+        val insideScope = selectedScope != null && !showingScopeHierarchy
+        if (insideScope || canGoBack) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (insideScope) {
+                    val scopeLabel = selectedScope?.let { "${it.subject} · ${it.grade}" }
+                    OutlinedButton(onClick = onBackToSubjects) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回科目选择")
+                        Spacer(Modifier.width(6.dp))
+                        Text("返回科目选择")
+                    }
+                    scopeLabel?.let { label ->
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (canGoBack) {
+                    OutlinedButton(onClick = onGoBack) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "返回上一级知识点")
+                        Spacer(Modifier.width(6.dp))
+                        Text("返回上一级知识点")
+                    }
+                }
             }
         }
         if (displayMode == GraphDisplayMode.Outline) {
             KnowledgeScopePicker(catalog, selectedScope, onSelectScope)
         } else {
-            if (showingScopeHierarchy) SubjectPicker(catalog.map { it.subject }.distinct(), subject, onSelectSubject)
+            // Keep the subject row visible inside a scope too, so switching subjects
+            // never requires finding a way back first.
+            if (catalog.isNotEmpty()) SubjectPicker(catalog.map { it.subject }.distinct(), subject, onSelectSubject)
             RelationFilterRow(selected = relationFilter, onSelect = { relationFilter = it })
         }
         Spacer(Modifier.height(12.dp))
