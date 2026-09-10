@@ -125,16 +125,86 @@ private fun blockedResponse() = WebResourceResponse(
 )
 
 private fun mathHtml(value: String, color: String, fontSize: Float, lineHeight: Float): String {
-    val escaped = TextUtils.htmlEncode(value)
+    val escaped = markdownToHtml(TextUtils.htmlEncode(value))
     val dollar = '$'
     return """<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self'; img-src data:">
 <link rel="stylesheet" href="katex.min.css">
-<style>html,body{margin:0;padding:0;background:transparent;color:$color;font:400 ${fontSize}px/${lineHeight}px system-ui,sans-serif;overflow:hidden}#content{white-space:pre-wrap;overflow-wrap:anywhere}.katex-display{overflow-x:auto;overflow-y:hidden;margin:.45em 0}</style>
+<style>html,body{margin:0;padding:0;background:transparent;color:$color;font:400 ${fontSize}px/${lineHeight}px system-ui,sans-serif;overflow:hidden}#content{white-space:pre-wrap;overflow-wrap:anywhere}.katex-display{overflow-x:auto;overflow-y:hidden;margin:.45em 0}p{margin:0 0 .55em}p.h{font-weight:600;margin:.7em 0 .35em}ul,ol{margin:.2em 0 .55em;padding-left:1.35em}li{margin:.12em 0}strong{font-weight:600}code{font-family:ui-monospace,monospace;background:rgba(127,127,127,.16);border-radius:3px;padding:0 .18em}</style>
 </head><body><div id="content">$escaped</div><script src="katex.min.js"></script><script src="contrib/auto-render.min.js"></script>
 <script>renderMathInElement(document.getElementById('content'),{delimiters:[{left:'${dollar}${dollar}',right:'${dollar}${dollar}',display:true},{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false},{left:'${dollar}',right:'${dollar}',display:false}],throwOnError:false,strict:'ignore'});</script>
 </body></html>"""
 }
+
+/**
+ * Render the small Markdown subset the model actually emits.
+ *
+ * Model answers arrive with `##` headings, `**bold**` and `-`/`1.` lists, and the
+ * WebView used to print those markers verbatim. Input is already HTML-escaped, so
+ * only the Markdown markers themselves are transformed here.
+ */
+private fun markdownToHtml(escaped: String): String {
+    val block = StringBuilder()
+    val paragraph = StringBuilder()
+    var listTag: String? = null
+
+    fun flushParagraph() {
+        if (paragraph.isNotEmpty()) {
+            block.append("<p>").append(paragraph).append("</p>")
+            paragraph.clear()
+        }
+    }
+
+    fun closeList() {
+        if (listTag != null) {
+            block.append("</").append(listTag).append(">")
+            listTag = null
+        }
+    }
+
+    escaped.split("\n").forEach { rawLine ->
+        val line = rawLine.trimEnd()
+        val heading = Regex("^#{1,6}\\s+(.*)$").find(line)
+        val bullet = Regex("^[-*]\\s+(.*)$").find(line)
+        val ordered = Regex("^\\d+[.)]\\s+(.*)$").find(line)
+        when {
+            heading != null -> {
+                flushParagraph()
+                closeList()
+                block.append("<p class=\"h\">").append(inlineMarkdown(heading.groupValues[1])).append("</p>")
+            }
+            bullet != null -> {
+                flushParagraph()
+                if (listTag != "ul") { closeList(); block.append("<ul>"); listTag = "ul" }
+                block.append("<li>").append(inlineMarkdown(bullet.groupValues[1])).append("</li>")
+            }
+            ordered != null -> {
+                flushParagraph()
+                if (listTag != "ol") { closeList(); block.append("<ol>"); listTag = "ol" }
+                block.append("<li>").append(inlineMarkdown(ordered.groupValues[1])).append("</li>")
+            }
+            line.isBlank() -> {
+                flushParagraph()
+                closeList()
+            }
+            else -> {
+                closeList()
+                // Keep hard line breaks as real newlines: `#content` is pre-wrap, and
+                // splitting a line with <br> would break KaTeX display math that
+                // spans several lines inside \[ ... \].
+                if (paragraph.isNotEmpty()) paragraph.append("\n")
+                paragraph.append(inlineMarkdown(line))
+            }
+        }
+    }
+    flushParagraph()
+    closeList()
+    return block.toString()
+}
+
+private fun inlineMarkdown(value: String): String = value
+    .replace(Regex("\\*\\*([^*]+)\\*\\*"), "<strong>${'$'}1</strong>")
+    .replace(Regex("`([^`]+)`"), "<code>${'$'}1</code>")
 
 private const val KATEX_ASSET_ROOT = "https://appassets.androidplatform.net/assets/katex/"
