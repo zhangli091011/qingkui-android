@@ -38,7 +38,8 @@ fun DynamicIslandNav(
 ) {
     val destinations = buildList {
         addAll(listOf(AppDestination.Chat, AppDestination.Graph, AppDestination.Learning))
-        add(AppDestination.Mistakes)
+        // 错题入口按产品决策下线：错题相关流程仍保留在代码里，
+        // 但不再从主导航暴露，需要时可通过内部路由直接进入。
         add(AppDestination.Corpus)
         if (!compact) add(AppDestination.Account)
     }

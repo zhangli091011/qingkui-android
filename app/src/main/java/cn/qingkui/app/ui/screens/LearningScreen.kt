@@ -108,7 +108,11 @@ fun LearningScreen(
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onShowLearning) { Text("学习记录", color = if (!showMistakes) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
-                TextButton(onClick = onShowMistakes) { Text("错题本", color = if (showMistakes) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
+                // 错题入口已隐藏：只有已经处在错题视图时才保留这个切换按钮，
+                // 学习页本身不再提供进入错题本的入口。
+                if (showMistakes) {
+                    TextButton(onClick = onShowMistakes) { Text("错题本", color = MaterialTheme.colorScheme.primary) }
+                }
             }
             Spacer(Modifier.height(24.dp))
             if (showMistakes) {

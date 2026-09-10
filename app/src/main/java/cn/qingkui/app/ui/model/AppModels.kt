@@ -197,6 +197,8 @@ data class KnowledgeCatalogScope(
     val grade: String,
     val textbookVersion: String,
     val nodeCount: Int,
+    /** Textbook volume (课本分册) such as 必修一 / 必修二, used as the graph branch label. */
+    val volume: String = "",
 )
 
 @Immutable

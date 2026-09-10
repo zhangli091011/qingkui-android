@@ -301,6 +301,7 @@ data class KnowledgeCatalogItemDto(
     val subject: String,
     val grade: String,
     @SerializedName("textbook_version") val textbookVersion: String,
+    val volume: String? = null,
     @SerializedName("node_count") val nodeCount: Int,
 )
 data class KnowledgeTreeNodeDto(val id: String, val name: String, val status: String)

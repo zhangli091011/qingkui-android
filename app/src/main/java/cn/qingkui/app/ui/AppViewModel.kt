@@ -21,6 +21,7 @@ import cn.qingkui.app.ui.model.QaMode
 import cn.qingkui.app.ui.model.QaClarificationOption
 import cn.qingkui.app.ui.model.KnowledgeStatus
 import cn.qingkui.app.ui.model.KnowledgeCatalogScope
+import cn.qingkui.app.ui.model.KnowledgeNode
 import cn.qingkui.app.ui.model.LearningFilter
 import cn.qingkui.app.ui.model.MistakeItem
 import cn.qingkui.app.ui.model.WorkspaceCapabilities
@@ -896,13 +897,23 @@ class AppViewModel(
                         val fresh = expansion.nodes.filterNot { node -> existingNodes.containsKey(node.id) }
                         val anchorX = anchor?.x ?: 0.5f
                         val anchorY = anchor?.y ?: 0.5f
-                        fresh.forEachIndexed { index, node ->
-                            val angle = (-Math.PI / 2.0) + (2.0 * Math.PI * index / fresh.size.coerceAtLeast(1))
-                            val radius = 0.16f + (index / 6) * 0.045f
-                            existingNodes[node.id] = node.copy(
-                                x = (anchorX + radius * kotlin.math.cos(angle)).coerceIn(0.08, 0.92).toFloat(),
-                                y = (anchorY + radius * kotlin.math.sin(angle)).coerceIn(0.12, 0.88).toFloat(),
-                            )
+                        // Children stack in a tidy column to the right of the source
+                        // node, in a stable order. The previous radial layout scattered
+                        // siblings around the parent and produced crossing edges.
+                        val childX = (anchorX + 0.28f).coerceIn(0.12f, 0.9f)
+                        val ordered = fresh.sortedBy { node -> node.title }
+                        val spacing = (0.8f / ordered.size.coerceAtLeast(1)).coerceIn(0.09f, 0.15f)
+                        var cursorY = anchorY - spacing * (ordered.size - 1) / 2f
+                        ordered.forEach { node ->
+                            var y = cursorY.coerceIn(0.1f, 0.9f)
+                            var attempts = 0
+                            while (attempts < 12 && hasNodeNear(existingNodes.values, childX, y, node.id)) {
+                                y += spacing
+                                if (y > 0.9f) y = 0.1f
+                                attempts++
+                            }
+                            existingNodes[node.id] = node.copy(x = childX, y = y)
+                            cursorY += spacing
                         }
                         val mergedRelations = (it.graphRelations + expansion.relations)
                             .distinctBy { relation -> Triple(relation.fromId, relation.toId, relation.type) }
@@ -1333,6 +1344,12 @@ class AppViewModel(
         503 -> message ?: "AI 服务暂时不可用，请稍后再试"
         else -> message ?: "发生未知错误，请稍后重试"
     }
+
+    /** True when another graph node already occupies this slot, so layouts can avoid overlap. */
+    private fun hasNodeNear(nodes: Collection<KnowledgeNode>, x: Float, y: Float, ignoreId: String): Boolean =
+        nodes.any { node ->
+            node.id != ignoreId && kotlin.math.abs(node.x - x) < 0.16f && kotlin.math.abs(node.y - y) < 0.07f
+        }
 
     companion object {
         private val OCR_PENDING_STATUSES = setOf("queued", "recognizing")

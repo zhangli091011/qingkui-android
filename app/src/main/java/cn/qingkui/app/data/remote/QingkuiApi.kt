@@ -225,6 +225,7 @@ interface QingkuiApi {
         @Query("subject") subject: String,
         @Query("grade") grade: String,
         @Query("textbook_version") textbookVersion: String,
+        @Query("volume") volume: String? = null,
     ): cn.qingkui.app.data.remote.dto.KnowledgeTreeDto
 
     @GET("knowledge/nodes/{id}/neighbors")

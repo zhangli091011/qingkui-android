@@ -600,11 +600,11 @@ class NetworkAppRepository(
     }
 
     override suspend fun knowledgeCatalog(): List<KnowledgeCatalogScope> = apiCall {
-        api.knowledgeCatalog().map { KnowledgeCatalogScope(it.subject, it.grade, it.textbookVersion, it.nodeCount) }
+        api.knowledgeCatalog().map { KnowledgeCatalogScope(it.subject, it.grade, it.textbookVersion, it.nodeCount, it.volume.orEmpty()) }
     }
 
     override suspend fun knowledgeTree(scope: KnowledgeCatalogScope): List<KnowledgeTreeChapter> = apiCall {
-        api.knowledgeTree(scope.subject, scope.grade, scope.textbookVersion).chapters.map { chapter ->
+        api.knowledgeTree(scope.subject, scope.grade, scope.textbookVersion, scope.volume.ifBlank { null }).chapters.map { chapter ->
             KnowledgeTreeChapter(
                 chapter.name,
                 chapter.sections.map { section ->

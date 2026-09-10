@@ -291,25 +291,60 @@ private fun SubjectPicker(subjects: List<String>, selected: String, onSelect: (S
     Spacer(Modifier.height(6.dp))
 }
 
-/** Build the top-level navigation graph: subject nodes are the visual centres,
- * with grades as their immediate children. Knowledge nodes are only loaded
- * after a grade is chosen, keeping subject/grade scope explicit. */
+/**
+ * Build the top-level navigation graph.
+ *
+ * The subject sits on the left and its textbook volumes (必修一 / 必修二 / 综合资料)
+ * stack vertically to the right, so every edge reads left to right and sibling
+ * branches never cross each other.
+ */
 private fun buildScopeGraph(catalog: List<KnowledgeCatalogScope>): Triple<List<KnowledgeNode>, List<KnowledgeRelation>, Map<String, KnowledgeCatalogScope>> {
     val nodes = mutableListOf<KnowledgeNode>()
     val relations = mutableListOf<KnowledgeRelation>()
     val scopes = linkedMapOf<String, KnowledgeCatalogScope>()
-    catalog.groupBy { it.subject }.toSortedMap().entries.forEachIndexed { subjectIndex, (subject, subjectScopes) ->
+    val rootX = 0.28f
+    val branchX = 0.66f
+    val centerY = 0.5f
+    val spacing = 0.16f
+
+    catalog.groupBy { it.subject }.toSortedMap().forEach { (subject, subjectScopes) ->
         val centerId = "scope:subject:$subject"
-        val centerX = ((subjectIndex + 1f) / (catalog.map { it.subject }.distinct().size + 1f)).coerceIn(.2f, .8f)
-        nodes += KnowledgeNode(centerId, subject, "学科", KnowledgeStatus.Explored, centerX, .42f, KnowledgeKind.Concept, KnowledgeSource.Official, "${subject}知识图谱", "学科导航")
-        subjectScopes.distinctBy { it.grade }.forEachIndexed { gradeIndex, scope ->
-            val gradeId = "scope:grade:${scope.subject}:${scope.grade}:${scope.textbookVersion}"
-            val angle = (-Math.PI / 2.0) + (Math.PI * (gradeIndex + 1) / (subjectScopes.distinctBy { it.grade }.size + 1))
-            val x = (centerX + .22f * kotlin.math.cos(angle)).coerceIn(.08, .92).toFloat()
-            val y = (.42 + .28 * kotlin.math.sin(angle)).coerceIn(.18, .82).toFloat()
-            nodes += KnowledgeNode(gradeId, scope.grade, scope.textbookVersion, KnowledgeStatus.Unexplored, x, y, KnowledgeKind.Concept, KnowledgeSource.Official, "${scope.subject} · ${scope.grade} · ${scope.nodeCount} 个知识点", "${scope.subject} · ${scope.grade}")
-            relations += KnowledgeRelation(centerId, gradeId, RelationType.Extension)
-            scopes[gradeId] = scope
+        nodes += KnowledgeNode(
+            id = centerId,
+            title = subject,
+            subtitle = "学科",
+            status = KnowledgeStatus.Explored,
+            x = rootX,
+            y = centerY,
+            kind = KnowledgeKind.Concept,
+            source = KnowledgeSource.Official,
+            description = "${subject}知识图谱",
+            evidence = "学科导航",
+        )
+
+        // One branch per textbook volume, not per grade: students pick a book.
+        val volumes = subjectScopes
+            .groupBy { it.volume.ifBlank { it.textbookVersion } }
+            .toSortedMap()
+        val startY = centerY - spacing * (volumes.size - 1) / 2f
+        volumes.entries.forEachIndexed { index, (volume, volumeScopes) ->
+            val scope = volumeScopes.first()
+            val branchId = "scope:volume:${scope.subject}:${scope.grade}:${scope.textbookVersion}:$volume"
+            val y = (startY + spacing * index).coerceIn(0.14f, 0.86f)
+            nodes += KnowledgeNode(
+                id = branchId,
+                title = volume,
+                subtitle = "${scope.grade} · ${scope.textbookVersion}",
+                status = KnowledgeStatus.Unexplored,
+                x = branchX,
+                y = y,
+                kind = KnowledgeKind.Concept,
+                source = KnowledgeSource.Official,
+                description = "${volumeScopes.sumOf { it.nodeCount }} 个知识点",
+                evidence = "${scope.subject} · ${scope.grade} · ${scope.textbookVersion}",
+            )
+            relations += KnowledgeRelation(centerId, branchId, RelationType.Extension)
+            scopes[branchId] = scope
         }
     }
     return Triple(nodes, relations, scopes)

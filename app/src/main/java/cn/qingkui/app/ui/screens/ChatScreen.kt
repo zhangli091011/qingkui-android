@@ -73,6 +73,12 @@ import cn.qingkui.app.ui.model.QaMode
 import cn.qingkui.app.ui.model.QaClarification
 import cn.qingkui.app.ui.model.QaClarificationOption
 
+/**
+ * 学生端不再展示“参考来源”：知识库只在服务端作为交叉校验数据使用。
+ * 保留这个开关，方便后续给教师端或管理端做溯源视图。
+ */
+private const val SHOW_REFERENCE_SOURCES = false
+
 @Composable
 fun ChatScreen(
     compact: Boolean,
@@ -320,7 +326,7 @@ private fun MessageRow(
             ) {
                 MathRichText(message.text, style = MaterialTheme.typography.bodyLarge)
             }
-            if (!student && (message.citations.isNotEmpty() || message.source != null)) {
+            if (SHOW_REFERENCE_SOURCES && !student && (message.citations.isNotEmpty() || message.source != null)) {
                 Spacer(Modifier.height(12.dp))
                 Text("参考来源", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 if (message.citations.isNotEmpty()) {
